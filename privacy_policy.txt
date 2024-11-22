@@ -1,7 +1,0 @@
-I and this service would not log or use any of your provided information.
-
-Your information is encrypted with TLS before being processed and is not likely to be captured by any third party.
-
-This service is hosted on Cloudflare Pages, which has their own privacy policy.
-
-Last edited: Wed Nov 20 17:43:37 CST 2024

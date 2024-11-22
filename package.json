@@ -1,17 +1,17 @@
 {
-  "name": "exhentai-igneous-generator ",
+  "name": "exhentai-igneous-generator",
   "version": "1.0.0",
   "description": "",
-  "main": "_worker.js",
+  "main": "server.js",
   "scripts": {
-    "deploy": "wrangler deploy",
-    "build": "wrangler deploy --dry-run",
-    "dev": "wrangler dev --remote"
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "WTFPL",
-  "devDependencies": {
-    "@cloudflare/workers-types": "^4.20230710.1",
-    "wrangler": "^3.2.0"
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
   }
 }
+
