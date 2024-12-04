@@ -47,7 +47,7 @@ app.all('/api', async (req, res) => {
     const headersObject = {};
     response.headers.forEach((value, key) => (headersObject[key] = value));
 
-    const uconfigUrl = "https://exhentai.org/uconfig.php";
+    const uconfigUrl = "https://e-hentai.org/uconfig.php";
     const uconfigResponse = await fetch(uconfigUrl, { headers });
     const html = await uconfigResponse.text();
     const match = html.match(/<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/);
