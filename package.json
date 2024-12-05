@@ -3,16 +3,18 @@
   "name": "exhentai-igneous-generator",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "api/index.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "func start",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "WTFPL",
   "dependencies": {
-    "express": "^4.18.2",
     "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "azure-functions-core-tools": "^4.0.5035"
   }
 }
 

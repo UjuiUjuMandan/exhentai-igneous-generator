@@ -1,27 +1,29 @@
-import express from 'express';
 import fetch from 'node-fetch';
 
-const app = express();
-app.use(express.json());
+// Azure Function handler
+export async function index(context, req) {
+  context.res = {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  };
 
-app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') {
-    return res.status(204).send();
+  if (req.method === "OPTIONS") {
+    context.res.status = 204;
+    return;
   }
-  next();
-});
 
-app.all('/api', async (req, res) => {
   try {
     const { method, query, body } = req;
     const ipbMemberId = method === "GET" ? query.ipb_member_id : body.ipb_member_id;
     const ipbPassHash = method === "GET" ? query.ipb_pass_hash : body.ipb_pass_hash;
 
     if (!ipbMemberId || !ipbPassHash) {
-      return res.status(400).json({ error: "Missing required parameters" });
+      context.res.status = 400;
+      context.res.body = { error: "Missing required parameters" };
+      return;
     }
 
     const cookie = `ipb_member_id=${ipbMemberId}; ipb_pass_hash=${ipbPassHash}`;
@@ -36,10 +38,11 @@ app.all('/api', async (req, res) => {
     );
 
     if (banMatch) {
-      return res.json({
+      context.res.body = {
         accountStatus: "banned",
         banEndDate: banMatch[1],
-      });
+      };
+      return;
     }
 
     const targetUrl = "https://exhentai.org/";
@@ -47,25 +50,21 @@ app.all('/api', async (req, res) => {
     const headersObject = {};
     response.headers.forEach((value, key) => (headersObject[key] = value));
 
-    const uconfigUrl = "https://e-hentai.org/uconfig.php";
+    const uconfigUrl = "https://exhentai.org/uconfig.php";
     const uconfigResponse = await fetch(uconfigUrl, { headers });
     const html = await uconfigResponse.text();
     const match = html.match(/<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/);
     const browsingCountry = match ? match[1] : "Unknown";
 
-    return res.json({
+    context.res.body = {
       accountStatus: "Unknown",
       headers: headersObject,
       browsingCountry: browsingCountry,
-    });
+    };
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message });
+    context.log.error(error);
+    context.res.status = 500;
+    context.res.body = { error: error.message };
   }
-});
-
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+};
 
