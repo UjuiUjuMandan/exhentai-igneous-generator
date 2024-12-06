@@ -1,0 +1,18 @@
+service: express-app
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  timeout: 30
+  environment:
+    NODE_ENV: production
+
+functions:
+  app:
+    handler: handler.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+

@@ -64,8 +64,11 @@ app.all('/api', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+export default app;
 
+const PORT = process.env.PORT || 8080;
+if (!process.env.LAMBDA_TASK_ROOT) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
