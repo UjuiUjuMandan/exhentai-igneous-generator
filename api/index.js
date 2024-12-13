@@ -28,6 +28,13 @@ export default async function handler(req, res) {
       });
     }
 
+    const traceUrl = "https://exhentai.org/cdn-cgi/trace";
+    const traceResponse = await fetch(traceUrl, { headers });
+    const traceText = await traceResponse.text();
+
+    const ipMatch = traceText.match(/ip=([^\n]+)/);
+    const ipAddress = ipMatch ? ipMatch[1] : "Unknown";
+
     const targetUrl = "https://exhentai.org/";
     const response = await fetch(targetUrl, { headers });
     const headersObject = {};
@@ -43,10 +50,10 @@ export default async function handler(req, res) {
       accountStatus: "Unknown",
       headers: headersObject,
       browsingCountry: browsingCountry,
+      ipAddress: ipAddress,
     });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: error.message });
   }
 }
-
