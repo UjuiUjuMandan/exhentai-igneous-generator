@@ -15,12 +15,6 @@
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     }
-  ],
-  "routes": [
-    {
-      "src": "/api",
-      "dest": "api/index.js"
-    }
   ]
 }
 
