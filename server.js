@@ -4,8 +4,10 @@ import fetch from 'node-fetch';
 const app = express();
 app.use(express.json());
 
+const ALLOWED_ORIGIN = 'https://exhentai-igneous-generator.pages.dev';
+
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
