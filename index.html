@@ -212,14 +212,15 @@
     // Functions still just do a plain fetch(), so the picker is hidden there.
     for (const country of Object.keys(COUNTRY_IPS).sort()) {
       const option = document.createElement("option");
+      const label = COUNTRY_ZH[country] ? `${country} (${COUNTRY_ZH[country]})` : country;
       // United States gets a fresh random Cloudflare WARP IPv6 per request
       // instead of one fixed probe IP (see generateUsWarpIp in country-ips.js).
       if (country === "United States") {
         option.value = US_RANDOM_SENTINEL;
-        option.textContent = `${country} (${US_RANDOM_IP_PATTERN})`;
+        option.textContent = `${label} (${US_RANDOM_IP_PATTERN})`;
       } else {
         option.value = COUNTRY_IPS[country];
-        option.textContent = `${country} (${COUNTRY_IPS[country]})`;
+        option.textContent = `${label} (${COUNTRY_IPS[country]})`;
       }
       countrySelect.appendChild(option);
     }
