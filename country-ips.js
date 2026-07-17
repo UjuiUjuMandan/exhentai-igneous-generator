@@ -1,6 +1,3 @@
-// United States is special-cased: exhentai buckets it by Cloudflare WARP's
-// US IPv6 pool, so a single fixed probe IP maps to one city/state every time.
-// Generate a fresh address in that pool per request instead.
 function generateUsWarpIp() {
   const choices = ['8', 'a', 'c', 'e'];
   const x = choices[Math.floor(Math.random() * choices.length)];
