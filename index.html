@@ -237,10 +237,9 @@
       countrySelect.disabled = !isDefaultWorkersEndpoint;
       countryLabel.style.display = isDefaultWorkersEndpoint ? "block" : "none";
       countrySelect.style.display = isDefaultWorkersEndpoint ? "block" : "none";
-      if (!isDefaultWorkersEndpoint) {
-        countrySelect.value = "";
-        customCountryIpInput.style.display = "none";
-      }
+      // Just hide it - don't reset countrySelect.value here, or switching away
+      // and back to the Workers endpoint loses whatever was picked before.
+      customCountryIpInput.style.display = (isDefaultWorkersEndpoint && countrySelect.value === "custom") ? "block" : "none";
     };
 
     endpointSelect.addEventListener("change", () => {

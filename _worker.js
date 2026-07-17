@@ -159,7 +159,9 @@ class SetAPI {
       element.setAttribute("value", this.newAPI);
       element.removeAttribute("hidden");
     } else {
-      element.removeAttribute("value");
+      // Safari doesn't respect `hidden` on <option> elements (still shows
+      // them in the popup), so actually drop the element instead.
+      element.remove();
     }
   }
 }
