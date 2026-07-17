@@ -104,6 +104,12 @@
       <option value="custom">Custom</option>
     </select>
     <input type="text" id="custom-endpoint" placeholder="Enter custom API endpoint" style="display: none;">
+
+    <label id="country-label" for="country-select">CF-Connecting-IP</label>
+    <select id="country-select">
+      <option value="" id="country-default-option">None</option>
+    </select>
+    <input type="text" id="custom-country-ip" placeholder="Enter IP address" style="display: none;">
   </form>
 
   <form id="cookie-form">
@@ -131,6 +137,7 @@
     <p id="source-code">Source code available on <a href="https://github.com/UjuiUjuMandan/exhentai-igneous-generator" target="_blank">GitHub</a></p>
   </footer>
 
+  <script src="/country-ips.js"></script>
   <script>
     const translations = {
       "zh": {
@@ -144,7 +151,9 @@
         statusMessage: "代码已复制到剪贴板！",
         errorMessage: "复制失败：发生错误！",
         privacyPolicy: "隐私政策",
-        sourceCode: "源代码在"
+        sourceCode: "源代码在",
+        countryLabel: "CF-Connecting-IP",
+        countryDefault: "无"
       },
       "en": {
         title: "ExHentai Igneous Generator",
@@ -157,7 +166,9 @@
         statusMessage: "Code copied to clipboard!",
         errorMessage: "Failed to copy: Something went wrong!",
         privacyPolicy: "Privacy Policy",
-        sourceCode: "Source code available on"
+        sourceCode: "Source code available on",
+        countryLabel: "CF-Connecting-IP",
+        countryDefault: "None"
       }
     };
 
@@ -175,20 +186,73 @@
       document.getElementById("error-message").textContent = translations[lang].errorMessage;
       document.getElementById("privacy-policy").textContent = translations[lang].privacyPolicy;
       document.getElementById("source-code").innerHTML = `${translations[lang].sourceCode} <a href="https://github.com/UjuiUjuMandan/exhentai-igneous-generator" target="_blank">GitHub</a>`;
+      document.getElementById("country-label").textContent = translations[lang].countryLabel;
+      document.getElementById("country-default-option").textContent = translations[lang].countryDefault;
     };
 
     applyTranslations();
 
     const endpointSelect = document.getElementById("api-endpoint");
     const customEndpointInput = document.getElementById("custom-endpoint");
-    
+    const countrySelect = document.getElementById("country-select");
+    const customCountryIpInput = document.getElementById("custom-country-ip");
+
+    // Shown next to United States instead of the literal word "random": the
+    // exact shape generateUsWarpIp() (below) produces on every request.
+    const US_RANDOM_IP_PATTERN = "2a09:bac1:76[8ace]0:[0-9][0-9a-f]{3}:0000:0000:0[0-9a-f]{3}:0[0-9a-f]{3}";
+
+    const customCountryOption = document.createElement("option");
+    customCountryOption.value = "custom";
+    customCountryOption.textContent = "Custom";
+    countrySelect.appendChild(customCountryOption);
+
+    // Country spoofing (CF-Connecting-IP) only works through this project's
+    // own Cloudflare Workers /api endpoint, which is the only one that speaks
+    // TLS directly to exhentai.org itself. Cloud Run / AWS Lambda / Azure
+    // Functions still just do a plain fetch(), so the picker is hidden there.
+    for (const country of Object.keys(COUNTRY_IPS).sort()) {
+      const option = document.createElement("option");
+      // United States gets a fresh random Cloudflare WARP IPv6 per request
+      // instead of one fixed probe IP (see generateUsWarpIp in country-ips.js).
+      if (country === "United States") {
+        option.value = US_RANDOM_SENTINEL;
+        option.textContent = `${country} (${US_RANDOM_IP_PATTERN})`;
+      } else {
+        option.value = COUNTRY_IPS[country];
+        option.textContent = `${country} (${COUNTRY_IPS[country]})`;
+      }
+      countrySelect.appendChild(option);
+    }
+
+    countrySelect.value = US_RANDOM_SENTINEL;
+
+    const countryLabel = document.getElementById("country-label");
+
+    countrySelect.addEventListener("change", () => {
+      customCountryIpInput.style.display = countrySelect.value === "custom" ? "block" : "none";
+    });
+
+    const updateCountrySelectAvailability = () => {
+      const isDefaultWorkersEndpoint = endpointSelect.value === "/api";
+      countrySelect.disabled = !isDefaultWorkersEndpoint;
+      countryLabel.style.display = isDefaultWorkersEndpoint ? "block" : "none";
+      countrySelect.style.display = isDefaultWorkersEndpoint ? "block" : "none";
+      if (!isDefaultWorkersEndpoint) {
+        countrySelect.value = "";
+        customCountryIpInput.style.display = "none";
+      }
+    };
+
     endpointSelect.addEventListener("change", () => {
       if (endpointSelect.value === "custom") {
         customEndpointInput.style.display = "block";
       } else {
         customEndpointInput.style.display = "none";
       }
+      updateCountrySelectAvailability();
     });
+
+    updateCountrySelectAvailability();
 
     document.getElementById("submit-button").addEventListener("click", async () => {
       const memberId = document.getElementById("ipb_member_id").value;
@@ -214,6 +278,21 @@
       }
 
       url += `?ipb_member_id=${encodeURIComponent(memberId)}&ipb_pass_hash=${encodeURIComponent(passHash)}`;
+      if (!countrySelect.disabled && countrySelect.value) {
+        let spoofedIp;
+        if (countrySelect.value === US_RANDOM_SENTINEL) {
+          spoofedIp = generateUsWarpIp();
+        } else if (countrySelect.value === "custom") {
+          spoofedIp = customCountryIpInput.value.trim();
+          if (!spoofedIp) {
+            showError("Please enter a CF-Connecting-IP value.");
+            return;
+          }
+        } else {
+          spoofedIp = countrySelect.value;
+        }
+        url += `&cf_connecting_ip=${encodeURIComponent(spoofedIp)}`;
+      }
 
       try {
         const response = await fetch(url);

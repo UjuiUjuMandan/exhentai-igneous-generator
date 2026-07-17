@@ -1,17 +1,25 @@
+import { directHttpsRequest } from "./lib/directTls.js";
+
+// Only plain IPv4/IPv6 characters allowed, so a spoofed value can never break
+// out of the header line (no CR/LF, no ": " injection).
+const IP_RE = /^[0-9a-fA-F:.]+$/;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
     if (url.pathname === "/api") {
-      let ipbMemberId, ipbPassHash;
+      let ipbMemberId, ipbPassHash, cfConnectingIp;
       try {
         if (request.method === "GET") {
           ipbMemberId = url.searchParams.get("ipb_member_id");
           ipbPassHash = url.searchParams.get("ipb_pass_hash");
+          cfConnectingIp = url.searchParams.get("cf_connecting_ip");
         } else if (request.method === "POST") {
           const body = await request.json();
           ipbMemberId = body.ipb_member_id;
           ipbPassHash = body.ipb_pass_hash;
+          cfConnectingIp = body.cf_connecting_ip;
         } else if (request.method === "OPTIONS") {
           return new Response(null, {
             status: 204,
@@ -29,12 +37,14 @@ export default {
           return new Response("Missing required parameters: ipb_member_id and ipb_pass_hash", { status: 400 });
         }
 
+        if (cfConnectingIp && !IP_RE.test(cfConnectingIp)) {
+          return new Response("Invalid cf_connecting_ip", { status: 400 });
+        }
+
         const cookie = `ipb_member_id=${ipbMemberId}; ipb_pass_hash=${ipbPassHash}`;
         const headers = new Headers();
         headers.set("Cookie", cookie);
 
-        const targetUrl = "https://exhentai.org/";
-        const uconfigUrl = "https://e-hentai.org/uconfig.php";
         const forumsUrl = "https://forums.e-hentai.org";
 
         const forumsResponse = await fetch(forumsUrl, { method: "GET", headers });
@@ -66,19 +76,35 @@ export default {
           );
         }
 
-        const response = await fetch(targetUrl, { method: "GET", headers });
-        const headersObject = {};
-        for (const [key, value] of response.headers.entries()) {
-          headersObject[key] = value;
-        }
+        // exhentai.org is geo-blocked at Cloudflare's edge, and a normal fetch()
+        // always shows Cloudflare's own (UK) CF-Connecting-IP to the origin,
+        // overwriting anything we set. So this one request bypasses fetch()
+        // entirely: connect() straight to the origin (s.exhentai.org) and
+        // speak TLS + HTTP/1.0 ourselves, which lets us set an arbitrary
+        // CF-Connecting-IP to spoof any country.
+        const directHeaders = { Cookie: cookie };
+        if (cfConnectingIp) directHeaders["CF-Connecting-IP"] = cfConnectingIp;
 
-        const uconfigResponse = await fetch(uconfigUrl, { method: "GET", headers });
-        if (!uconfigResponse.ok) {
-          return new Response("Failed to fetch uconfig.php", { status: uconfigResponse.status });
-        }
-        const html = await uconfigResponse.text();
+        const response = await directHttpsRequest({
+          origin: url.origin,
+          connectHost: "s.exhentai.org",
+          hostHeader: "exhentai.org",
+          path: "/",
+          headers: directHeaders,
+        });
+        const headersObject = response.headers;
 
-        const match = html.match(/<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/);
+        // Same direct-connect path, so the reported browsing country actually
+        // reflects the spoofed CF-Connecting-IP instead of Cloudflare's edge.
+        const uconfigResponse = await directHttpsRequest({
+          origin: url.origin,
+          connectHost: "s.exhentai.org",
+          hostHeader: "exhentai.org",
+          path: "/uconfig.php",
+          headers: directHeaders,
+        });
+
+        const match = uconfigResponse.body.match(/<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/);
         const browsingCountry = match ? match[1] : "Unknown";
 
         return new Response(
