@@ -50,7 +50,7 @@ app.all('/api', async (req, res) => {
     const uconfigUrl = "https://e-hentai.org/uconfig.php";
     const uconfigResponse = await fetch(uconfigUrl, { headers });
     const html = await uconfigResponse.text();
-    const match = html.match(/<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/);
+    const match = html.match(/<p>You appear to be located in <strong>(.*?)<\/strong>/);
     const browsingCountry = match ? match[1] : "Unknown";
 
     return res.json({
