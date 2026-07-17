@@ -277,7 +277,7 @@
         }
       }
 
-      url += `?ipb_member_id=${encodeURIComponent(memberId)}&ipb_pass_hash=${encodeURIComponent(passHash)}`;
+      const requestBody = { ipb_member_id: memberId, ipb_pass_hash: passHash };
       if (!countrySelect.disabled && countrySelect.value) {
         let spoofedIp;
         if (countrySelect.value === US_RANDOM_SENTINEL) {
@@ -291,11 +291,17 @@
         } else {
           spoofedIp = countrySelect.value;
         }
-        url += `&cf_connecting_ip=${encodeURIComponent(spoofedIp)}`;
+        requestBody.cf_connecting_ip = spoofedIp;
       }
 
       try {
-        const response = await fetch(url);
+        // POST, not GET - credentials belong in the body, not logged/cached/
+        // history-stored as part of a URL.
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        });
         const data = await response.json();
         
         document.getElementById("response-output").textContent = JSON.stringify(data, null, 2);

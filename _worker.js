@@ -3,12 +3,31 @@ import { openDirectHttpsSession } from "./lib/directTls.js";
 // Only plain IPv4/IPv6 characters allowed, so a spoofed value can never break
 // out of the header line (no CR/LF, no ": " injection).
 const IP_RE = /^[0-9a-fA-F:.]+$/;
+// IPB member IDs are plain integers. ipb_pass_hash is a hex hash digest - MD5
+// (32 chars) today, but not pinned to that exact length in case the site
+// ever changes hash algorithms; hex-only is what actually matters here, so a
+// stray CR/LF or other header-breaking character can never reach the
+// hand-rolled HTTP request we build in lib/directTls.js.
+const MEMBER_ID_RE = /^\d{1,20}$/;
+const PASS_HASH_RE = /^[a-f0-9]{16,128}$/i;
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
     if (url.pathname === "/api") {
+      // Same-origin only: our own frontend never needs cross-origin reads,
+      // and there's no reason to let arbitrary third-party sites' JS read
+      // responses from this endpoint via a visitor's browser.
+      const requestOrigin = request.headers.get("Origin");
+      const corsHeaders = requestOrigin === url.origin
+        ? {
+            "Access-Control-Allow-Origin": requestOrigin,
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+          }
+        : {};
+
       let ipbMemberId, ipbPassHash, cfConnectingIp;
       try {
         if (request.method === "GET") {
@@ -21,24 +40,25 @@ export default {
           ipbPassHash = body.ipb_pass_hash;
           cfConnectingIp = body.cf_connecting_ip;
         } else if (request.method === "OPTIONS") {
-          return new Response(null, {
-            status: 204,
-            headers: {
-              "Access-Control-Allow-Origin": "*",
-              "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-              "Access-Control-Allow-Headers": "Content-Type",
-            },
-          });
+          return new Response(null, { status: 204, headers: corsHeaders });
         } else {
-          return new Response("Only GET, POST, and OPTIONS methods are supported", { status: 405 });
+          return new Response("Only GET, POST, and OPTIONS methods are supported", { status: 405, headers: corsHeaders });
         }
 
         if (!ipbMemberId || !ipbPassHash) {
-          return new Response("Missing required parameters: ipb_member_id and ipb_pass_hash", { status: 400 });
+          return new Response("Missing required parameters: ipb_member_id and ipb_pass_hash", { status: 400, headers: corsHeaders });
+        }
+
+        if (!MEMBER_ID_RE.test(ipbMemberId)) {
+          return new Response("Invalid ipb_member_id", { status: 400, headers: corsHeaders });
+        }
+
+        if (!PASS_HASH_RE.test(ipbPassHash)) {
+          return new Response("Invalid ipb_pass_hash", { status: 400, headers: corsHeaders });
         }
 
         if (cfConnectingIp && !IP_RE.test(cfConnectingIp)) {
-          return new Response("Invalid cf_connecting_ip", { status: 400 });
+          return new Response("Invalid cf_connecting_ip", { status: 400, headers: corsHeaders });
         }
 
         const cookie = `ipb_member_id=${ipbMemberId}; ipb_pass_hash=${ipbPassHash}`;
@@ -68,10 +88,7 @@ export default {
             ),
             {
               status: 200,
-              headers: {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-              },
+              headers: { "Content-Type": "application/json", ...corsHeaders },
             }
           );
         }
@@ -115,19 +132,11 @@ export default {
           ),
           {
             status: 200,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": "*",
-            },
+            headers: { "Content-Type": "application/json", ...corsHeaders },
           }
         );
       } catch (err) {
-        return new Response(`Error: ${err.message}`, {
-          status: 500,
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-          },
-        });
+        return new Response(`Error: ${err.message}`, { status: 500, headers: corsHeaders });
       }
     }
 
