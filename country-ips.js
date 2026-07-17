@@ -178,7 +178,7 @@ const COUNTRY_IPS = {
   "Niue": "49.156.48.1",
   "Norfolk Island": "103.43.204.1",
   "North Korea": "175.45.176.1",
-  "Northern Mariana Islands": "150.228.213.1",
+  "Northern Mariana Islands": "179.65.128.0",
   "Norway": "46.227.192.1",
   "Oman": "5.21.0.1",
   "Pakistan": "14.1.104.1",
