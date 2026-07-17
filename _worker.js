@@ -78,11 +78,12 @@ export default {
 
         // exhentai.org is geo-blocked at Cloudflare's edge, and a normal fetch()
         // always shows Cloudflare's own (UK) CF-Connecting-IP to the origin,
-        // overwriting anything we set. So these requests bypass fetch()
-        // entirely: connect() straight to the origin (s.exhentai.org) and
-        // speak TLS + HTTP/1.1 ourselves, which lets us set an arbitrary
-        // CF-Connecting-IP to spoof any country. Both requests reuse the same
-        // TLS connection instead of handshaking twice.
+        // overwriting anything we set. So this bypasses fetch() entirely:
+        // connect() straight to the origin (s.exhentai.org) and speak TLS +
+        // HTTP/1.1 ourselves, which lets us set an arbitrary CF-Connecting-IP
+        // to spoof any country. /uconfig.php alone sets igneous (and the rest
+        // of the account cookies) and reports the browsing country, so one
+        // request covers both - no need to also hit "/".
         const directHeaders = { Cookie: cookie };
         if (cfConnectingIp) directHeaders["CF-Connecting-IP"] = cfConnectingIp;
 
@@ -94,13 +95,8 @@ export default {
 
         let headersObject, browsingCountry;
         try {
-          const response = await session.request({ path: "/", headers: directHeaders });
-          headersObject = response.headers;
-
-          // Same direct-connect path, so the reported browsing country
-          // actually reflects the spoofed CF-Connecting-IP instead of
-          // Cloudflare's edge.
           const uconfigResponse = await session.request({ path: "/uconfig.php", headers: directHeaders });
+          headersObject = uconfigResponse.headers;
           const match = uconfigResponse.body.match(/<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/);
           browsingCountry = match ? match[1] : "Unknown";
         } finally {
