@@ -1,10 +1,12 @@
 import fetch from 'node-fetch';
 
+const ALLOWED_ORIGIN = 'https://exhentai-igneous-generator.pages.dev';
+
 // Azure Function handler
 export async function index(context, req) {
   context.res = {
     headers: {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     },
