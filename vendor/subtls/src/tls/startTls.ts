@@ -1,4 +1,4 @@
-import { fromBase64 } from 'hextreme';
+import { fromBase64 } from '../util/hextremeLite';
 import makeClientHello from './makeClientHello';
 import parseServerHello from './parseServerHello';
 import { bytesFromEncryptedTlsRecords, bytesFromTlsRecords, makeEncryptedTlsRecords, readEncryptedTlsRecord } from './tlsRecord';

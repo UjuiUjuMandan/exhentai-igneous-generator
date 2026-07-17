@@ -1,4 +1,4 @@
-import { toHex } from 'hextreme';
+import { toHex } from './hextremeLite';
 
 export function u8FromHex(hex: string) {
   return new Uint8Array(Array.from(hex.matchAll(/[0-9a-f]{2}/g)).map(hex => parseInt(hex[0], 16)));

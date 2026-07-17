@@ -25,7 +25,7 @@ import {
 
 import { hexFromU8, u8FromHex } from '../util/hex';
 import { GrowableData } from '../util/array';
-import { fromBase64 } from 'hextreme';
+import { fromBase64 } from '../util/hextremeLite';
 
 export type OID = string;
 
