@@ -1,4 +1,4 @@
-import { directHttpsRequest } from "./lib/directTls.js";
+import { openDirectHttpsSession } from "./lib/directTls.js";
 
 // Only plain IPv4/IPv6 characters allowed, so a spoofed value can never break
 // out of the header line (no CR/LF, no ": " injection).
@@ -78,34 +78,34 @@ export default {
 
         // exhentai.org is geo-blocked at Cloudflare's edge, and a normal fetch()
         // always shows Cloudflare's own (UK) CF-Connecting-IP to the origin,
-        // overwriting anything we set. So this one request bypasses fetch()
+        // overwriting anything we set. So these requests bypass fetch()
         // entirely: connect() straight to the origin (s.exhentai.org) and
-        // speak TLS + HTTP/1.0 ourselves, which lets us set an arbitrary
-        // CF-Connecting-IP to spoof any country.
+        // speak TLS + HTTP/1.1 ourselves, which lets us set an arbitrary
+        // CF-Connecting-IP to spoof any country. Both requests reuse the same
+        // TLS connection instead of handshaking twice.
         const directHeaders = { Cookie: cookie };
         if (cfConnectingIp) directHeaders["CF-Connecting-IP"] = cfConnectingIp;
 
-        const response = await directHttpsRequest({
+        const session = await openDirectHttpsSession({
           origin: url.origin,
           connectHost: "s.exhentai.org",
           hostHeader: "exhentai.org",
-          path: "/",
-          headers: directHeaders,
-        });
-        const headersObject = response.headers;
-
-        // Same direct-connect path, so the reported browsing country actually
-        // reflects the spoofed CF-Connecting-IP instead of Cloudflare's edge.
-        const uconfigResponse = await directHttpsRequest({
-          origin: url.origin,
-          connectHost: "s.exhentai.org",
-          hostHeader: "exhentai.org",
-          path: "/uconfig.php",
-          headers: directHeaders,
         });
 
-        const match = uconfigResponse.body.match(/<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/);
-        const browsingCountry = match ? match[1] : "Unknown";
+        let headersObject, browsingCountry;
+        try {
+          const response = await session.request({ path: "/", headers: directHeaders });
+          headersObject = response.headers;
+
+          // Same direct-connect path, so the reported browsing country
+          // actually reflects the spoofed CF-Connecting-IP instead of
+          // Cloudflare's edge.
+          const uconfigResponse = await session.request({ path: "/uconfig.php", headers: directHeaders });
+          const match = uconfigResponse.body.match(/<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/);
+          browsingCountry = match ? match[1] : "Unknown";
+        } finally {
+          await session.close();
+        }
 
         return new Response(
           JSON.stringify(
