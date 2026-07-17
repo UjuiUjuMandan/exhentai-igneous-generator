@@ -24,7 +24,7 @@ const COUNTRY_IPS = {
   "Andorra": "46.172.224.1",
   "Angola": "41.63.160.1",
   "Anguilla": "104.193.196.1",
-  "Antarctica": "149.57.28.1",
+  "Antarctica": "130.12.92.0",
   "Antigua and Barbuda": "23.132.144.1",
   "Argentina": "24.152.57.1",
   "Armenia": "2.56.204.1",
