@@ -1,12 +1,27 @@
-I and the default services would not log or use any of your provided information.
+1. Privacy Policy
+1.1. What I know about you
 
-Your information is encrypted with TLS before being processed and is not likely to be captured by any third party.
+1. Your IP address
+2. Your country based on IP address
+3. Your web browser's HTTP header including User-Agent, which includes your operating system, web browser, and device type (mobile or desktop).
+4. Your E-Hentai account credentials: ipb_member_id and ipb_pass_hash, granting full access to your account.
 
-The default services are hosted on many third parties, which have their own privacy policy.
+1.2. How will your data be logged
 
-This webpage uses Cloudflare Web Analytics, which means the following information that you will not actively provide will be collected and logged:
+The default backend services each run under that platform's own default logging configuration. These defaults (for example, AWS CloudWatch) may record request metadata such as your IP address, and possibly the request payload - which could include the sensitive credentials above. I haven't audited exactly what each platform's defaults capture.
 
-1. Your web browser's User-Agent in the HTTP header, which includes your operating system, web browser, and device type (mobile or desktop).
-2. Your country based on IP address.
+Cloudflare Web Analytics will log your IP address, country and User-Agent information.
 
-Last edited: Thu Dec 5 20:16:53 CST 2024
+1.3. How will I use your data
+
+The web application will forward your E-Hentai account credentials to the chosen cloud provider, which then requests the E-Hentai / ExHentai website to check possible account suspension and retrieve the igneous cookie.
+
+Cloudflare Web Analytics analyzes your data in aggregate, for overall traffic statistics.
+
+1.4. How will I not use your data
+
+Hacking into your E-Hentai account or selling your E-Hentai account credentials.
+
+Sharing your E-Hentai account credentials with any party other than the chosen cloud platform.
+
+Last edited: Fri Jul 17 20:20:11 CST 2026
