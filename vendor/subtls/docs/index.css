@@ -1,0 +1,158 @@
+body {
+  font: 400 15px/1.5 Georgia, serif;
+  padding: 0;
+  margin: 0;
+  color: #111;
+}
+
+a {
+  color: #58e;
+  text-decoration: none;
+}
+
+h1 {
+  line-height: 1.25;
+}
+
+#tabs {
+  border-bottom: 1px solid #aaa;
+  background: #aaa;
+  padding: 1.5ex 5ex 0;
+}
+
+#tabs a.tab {
+  position: relative;
+  top: 1px;
+  font: 11px/.8 Monaco, Menlo, Consolas, monospace;
+  display: inline-block;
+  padding: 12px 18px 10px;
+  background: #eee;
+  border-bottom: 1px solid #aaa;
+  border-top-left-radius: 2ex;
+  border-top-right-radius: 2ex;
+  color: inherit;
+  box-shadow: inset 0 -2px 4px #ddd;
+}
+
+#tabs .tab.active {
+  border-color: #fff;
+  background: #fff;
+  cursor: default;
+  box-shadow: unset;
+}
+
+.discussion {
+  padding: 3ex 5ex 1ex;
+}
+
+.q {
+  display: inline-block;
+  padding: 0 3px;
+  font-family: Monaco, Menlo, Consolas, monospace;
+  font-size: 92.5%;
+  background: #eee;
+}
+
+#logs input[type=checkbox] {
+  display: none;
+}
+
+#logs label {
+  display: block;
+}
+
+#logs,
+code,
+.hex {
+  font: 400 11px/1.5 Monaco, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #777;
+}
+
+code {
+  background: #eee;
+}
+
+p {
+  margin: 2em 0;
+}
+
+#http2 {
+  display: block;
+  margin-bottom: .4em;
+}
+
+#http2 input[type=checkbox] {
+  vertical-align: text-bottom;
+}
+
+#logs .section {
+  position: relative;
+  border-top: 1px solid #ddd;
+  padding: 0.75ex 5ex;
+  max-height: 9ex;
+  overflow-y: hidden;
+  background: #f8f8f8;
+}
+
+#logs .section a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+#logs .section a:hover {
+  background: #ffc;
+}
+
+.section:before {
+  content: '◀︎|▶︎ Click to expand';
+  text-transform: uppercase;
+  position: absolute;
+  padding: 0.25em 0.75em .25em 1em;
+  background-color: #aaa;
+  color: white;
+  transition: 0.2s;
+  right: 0;
+  top: 0;
+  font-size: 70%;
+  opacity: 0;
+  border-bottom-left-radius: 2ex;
+}
+
+.section:hover:before {
+  opacity: 1;
+}
+
+#logs input[type=checkbox]:checked+.section {
+  max-height: 10000em;
+  background: #fff;
+}
+
+#logs input[type=checkbox]:checked+.section:before {
+  content: '▶︎|◀︎ Click to collapse';
+}
+
+#controls {
+  font: 400 11px/1.5 Monaco, Menlo, Consolas, monospace;
+  position: fixed;
+  z-index: 100;
+  top: 0;
+  right: 0;
+  padding: .75ex 3ex .75ex;
+  border-bottom-left-radius: 2ex;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: .5px;
+  background-color: #aaa;
+}
+
+#controls a {
+  color: #fff;
+}
+
+.easter {
+  color: #ccc;
+}

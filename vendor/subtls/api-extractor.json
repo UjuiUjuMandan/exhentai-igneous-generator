@@ -1,0 +1,25 @@
+{
+  "mainEntryPointFilePath": "declarations/export.d.ts",
+  "newlineKind": "lf",
+  "enumMemberOrder": "preserve",
+  "dtsRollup": {
+    "enabled": true,
+    "untrimmedFilePath": "declarations/_extracted.d.ts"
+  },
+  "apiReport": {
+    "enabled": false
+  },
+  "docModel": {
+    "enabled": false
+  },
+  "tsdocMetadata": {
+    "enabled": false
+  },
+  "messages": {
+    "extractorMessageReporting": {
+      "ae-missing-release-tag": {
+        "logLevel": "none"
+      }
+    }
+  }
+}
