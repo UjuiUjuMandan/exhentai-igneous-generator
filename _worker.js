@@ -222,7 +222,7 @@ export default {
                 ? "unauthenticated"
                 : accountSuspended
                 ? "suspended"
-                : loggedInMatch
+                : loggedInMatch || browsingCountry !== "Unknown"
                 ? "OK"
                 : "Unknown",
               loginName: loginName,
