@@ -29,6 +29,12 @@ const EHENTAI_ORIGIN_IPS = [
   "95.211.79.42",
 ];
 
+const RATE_LIMIT_RE = /This IP address has been temporarily banned due to an excessive request rate\..*?The ban expires in (.*?)$/;
+const ACCOUNT_BAN_RE =
+  /<div class="errorwrap">\s*<h4>The error returned was:<\/h4>\s*<p>Your account has been temporarily suspended\. This suspension is due to end on (.*?)\.<\/p>/;
+const EXHENTAI_BROWSING_COUNTRY_RE = /<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/;
+const EHENTAI_BROWSING_COUNTRY_RE = /<p>You appear to be located in <strong>(.*?)<\/strong>/;
+
 function jsonError(message, status, corsHeaders) {
   return new Response(JSON.stringify({ error: message }), {
     status,
@@ -95,9 +101,7 @@ export default {
         const forumsResponse = await fetch(forumsUrl, { method: "GET", headers });
         const forumsHtml = await forumsResponse.text();
 
-        const banMatch = forumsHtml.match(
-          /<div class="errorwrap">\s*<h4>The error returned was:<\/h4>\s*<p>Your account has been temporarily suspended\. This suspension is due to end on (.*?)\.<\/p>/
-        );
+        const banMatch = forumsHtml.match(ACCOUNT_BAN_RE);
 
         if (banMatch) {
           const banEndDate = banMatch[1];
@@ -136,12 +140,18 @@ export default {
           sniHost: "exhentai.org",
         });
 
-        let headersObject, browsingCountry;
+        let headersObject, browsingCountry, rateLimitExpiresIn;
         try {
           const uconfigResponse = await session.request({ path: "/uconfig.php", headers: directHeaders });
           headersObject = uconfigResponse.headers;
-          const match = uconfigResponse.body.match(/<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/);
-          browsingCountry = match ? match[1] : "Unknown";
+          const rateLimitMatch = uconfigResponse.body.match(RATE_LIMIT_RE);
+          if (rateLimitMatch) {
+            rateLimitExpiresIn = rateLimitMatch[1];
+            browsingCountry = "Unknown";
+          } else {
+            const match = uconfigResponse.body.match(EXHENTAI_BROWSING_COUNTRY_RE);
+            browsingCountry = match ? match[1] : "Unknown";
+          }
         } finally {
           await session.close();
         }
@@ -150,7 +160,8 @@ export default {
         // IP has also passed exhentai's IP-auth check. If it hasn't (yet),
         // fall back to e-hentai.org, which only checks account credentials,
         // to still report a browsing country for this account/cookie pair.
-        if (browsingCountry === "Unknown") {
+        // The fallback is skipped if we're rate-limited.
+        if (browsingCountry === "Unknown" && !rateLimitExpiresIn) {
           const ehentaiIp = EHENTAI_ORIGIN_IPS[Math.floor(Math.random() * EHENTAI_ORIGIN_IPS.length)];
           const ehentaiSession = await openDirectHttpsSession({
             origin: url.origin,
@@ -160,8 +171,13 @@ export default {
           });
           try {
             const ehentaiResponse = await ehentaiSession.request({ path: "/uconfig.php", headers: directHeaders });
-            const ehentaiMatch = ehentaiResponse.body.match(/<p>You appear to be located in <strong>(.*?)<\/strong>/);
-            if (ehentaiMatch) browsingCountry = ehentaiMatch[1];
+            const ehentaiRateLimitMatch = ehentaiResponse.body.match(RATE_LIMIT_RE);
+            if (ehentaiRateLimitMatch) {
+              rateLimitExpiresIn = ehentaiRateLimitMatch[1];
+            } else {
+              const ehentaiMatch = ehentaiResponse.body.match(EHENTAI_BROWSING_COUNTRY_RE);
+              if (ehentaiMatch) browsingCountry = ehentaiMatch[1];
+            }
           } finally {
             await ehentaiSession.close();
           }
@@ -171,6 +187,8 @@ export default {
           JSON.stringify(
             {
               accountStatus: "Unknown",
+              ipStatus: rateLimitExpiresIn ? "rateLimited" : "OK",
+              ...(rateLimitExpiresIn ? { rateLimitExpiresIn } : {}),
               headers: headersObject,
               browsingCountry: browsingCountry,
             },
