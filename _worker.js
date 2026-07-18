@@ -11,6 +11,24 @@ const IP_RE = /^[0-9a-fA-F:.]+$/;
 const MEMBER_ID_RE = /^\d{1,20}$/;
 const PASS_HASH_RE = /^[a-f0-9]{16,128}$/i;
 
+// AS60781 LeaseWeb Netherlands B.V. Scanned Jul 18 2026
+const EHENTAI_ORIGIN_IPS = [
+  "212.7.200.92",
+  "212.7.200.95",
+  "212.7.202.35",
+  "212.7.202.48",
+  "37.48.81.199",
+  "37.48.81.210",
+  "37.48.81.211",
+  "37.48.92.184",
+  "5.79.104.107",
+  "5.79.104.108",
+  "89.149.222.76",
+  "89.149.222.79",
+  "95.211.79.41",
+  "95.211.79.42",
+];
+
 function jsonError(message, status, corsHeaders) {
   return new Response(JSON.stringify({ error: message }), {
     status,
@@ -115,6 +133,7 @@ export default {
           origin: url.origin,
           connectHost: "s.exhentai.org",
           hostHeader: "exhentai.org",
+          sniHost: "exhentai.org",
         });
 
         let headersObject, browsingCountry;
@@ -125,6 +144,27 @@ export default {
           browsingCountry = match ? match[1] : "Unknown";
         } finally {
           await session.close();
+        }
+
+        // exhentai's browsing-country string only appears once the spoofed
+        // IP has also passed exhentai's IP-auth check. If it hasn't (yet),
+        // fall back to e-hentai.org, which only checks account credentials,
+        // to still report a browsing country for this account/cookie pair.
+        if (browsingCountry === "Unknown") {
+          const ehentaiIp = EHENTAI_ORIGIN_IPS[Math.floor(Math.random() * EHENTAI_ORIGIN_IPS.length)];
+          const ehentaiSession = await openDirectHttpsSession({
+            origin: url.origin,
+            connectHost: ehentaiIp,
+            hostHeader: "e-hentai.org",
+            sniHost: "e-hentai.org",
+          });
+          try {
+            const ehentaiResponse = await ehentaiSession.request({ path: "/uconfig.php", headers: directHeaders });
+            const ehentaiMatch = ehentaiResponse.body.match(/<p>You appear to be located in <strong>(.*?)<\/strong>/);
+            if (ehentaiMatch) browsingCountry = ehentaiMatch[1];
+          } finally {
+            await ehentaiSession.close();
+          }
         }
 
         return new Response(
