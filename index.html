@@ -387,6 +387,7 @@
       const statusMessage = document.getElementById("status-message");
       statusMessage.textContent = message;
       statusMessage.style.display = "block";
+      statusMessage.scrollIntoView({ behavior: "smooth", block: "nearest" });
       setTimeout(() => statusMessage.style.display = "none", 3000);  // Hide after 3 seconds
     }
 
@@ -394,6 +395,7 @@
       const errorMessage = document.getElementById("error-message");
       errorMessage.textContent = message;
       errorMessage.style.display = "block";
+      errorMessage.scrollIntoView({ behavior: "smooth", block: "nearest" });
       setTimeout(() => errorMessage.style.display = "none", 3000);  // Hide after 3 seconds
     }
   </script>
