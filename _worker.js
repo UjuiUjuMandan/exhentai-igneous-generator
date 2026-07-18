@@ -32,8 +32,9 @@ const EHENTAI_ORIGIN_IPS = [
 const RATE_LIMIT_RE = /This IP address has been temporarily banned due to an excessive request rate\..*?The ban expires in (.*?)$/;
 const GUEST_RE = /<p class="pcen"><b>Welcome Guest<\/b>/;
 const LOGGED_IN_RE = /<p class="home"><b>Logged in as:\s*<a[^>]*>(.*?)<\/a>/;
-const ACCOUNT_BAN_RE =
+const ACCOUNT_SUSPENDED_FORUMS_RE =
   /<div class="errorwrap">\s*<h4>The error returned was:<\/h4>\s*<p>Your account has been temporarily suspended\. This suspension is due to end on (.*?)\.<\/p>/;
+const ACCOUNT_SUSPENDED_RE = /This page is currently not available, as your account has been suspended\./;
 const EXHENTAI_BROWSING_COUNTRY_RE = /<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/;
 const EHENTAI_BROWSING_COUNTRY_RE = /<p>You appear to be located in <strong>(.*?)<\/strong>/;
 
@@ -122,17 +123,17 @@ export default {
         }
 
         const loginName = loggedInMatch ? loggedInMatch[1] : undefined;
-        const banMatch = forumsHtml.match(ACCOUNT_BAN_RE);
+        const suspendedMatch = forumsHtml.match(ACCOUNT_SUSPENDED_FORUMS_RE);
 
-        if (banMatch) {
-          const banEndDate = banMatch[1];
+        if (suspendedMatch) {
+          const suspendedUntil = suspendedMatch[1];
 
           return new Response(
             JSON.stringify(
               {
-                accountStatus: "banned",
+                accountStatus: "suspended",
                 loginName: loginName,
-                banEndDate: banEndDate,
+                suspendedUntil: suspendedUntil,
               },
               null,
               2
@@ -162,13 +163,16 @@ export default {
           sniHost: "exhentai.org",
         });
 
-        let headersObject, browsingCountry, rateLimitExpiresIn;
+        let headersObject, browsingCountry, rateLimitExpiresIn, accountSuspended;
         try {
           const uconfigResponse = await session.request({ path: "/uconfig.php", headers: directHeaders });
           headersObject = uconfigResponse.headers;
           const rateLimitMatch = uconfigResponse.body.match(RATE_LIMIT_RE);
           if (rateLimitMatch) {
             rateLimitExpiresIn = rateLimitMatch[1];
+            browsingCountry = "Unknown";
+          } else if (ACCOUNT_SUSPENDED_RE.test(uconfigResponse.body)) {
+            accountSuspended = true;
             browsingCountry = "Unknown";
           } else {
             const match = uconfigResponse.body.match(EXHENTAI_BROWSING_COUNTRY_RE);
@@ -182,8 +186,9 @@ export default {
         // IP has also passed exhentai's IP-auth check. If it hasn't (yet),
         // fall back to e-hentai.org, which only checks account credentials,
         // to still report a browsing country for this account/cookie pair.
-        // The fallback is skipped if we're rate-limited.
-        if (browsingCountry === "Unknown" && !rateLimitExpiresIn) {
+        // The fallback is skipped if we're rate-limited or already confirmed
+        // suspended.
+        if (browsingCountry === "Unknown" && !rateLimitExpiresIn && !accountSuspended) {
           const ehentaiIp = EHENTAI_ORIGIN_IPS[Math.floor(Math.random() * EHENTAI_ORIGIN_IPS.length)];
           const ehentaiSession = await openDirectHttpsSession({
             origin: url.origin,
@@ -196,6 +201,8 @@ export default {
             const ehentaiRateLimitMatch = ehentaiResponse.body.match(RATE_LIMIT_RE);
             if (ehentaiRateLimitMatch) {
               rateLimitExpiresIn = ehentaiRateLimitMatch[1];
+            } else if (ACCOUNT_SUSPENDED_RE.test(ehentaiResponse.body)) {
+              accountSuspended = true;
             } else {
               const ehentaiMatch = ehentaiResponse.body.match(EHENTAI_BROWSING_COUNTRY_RE);
               if (ehentaiMatch) browsingCountry = ehentaiMatch[1];
@@ -208,7 +215,7 @@ export default {
         return new Response(
           JSON.stringify(
             {
-              accountStatus: loggedInMatch ? "OK" : "Unknown",
+              accountStatus: accountSuspended ? "suspended" : loggedInMatch ? "OK" : "Unknown",
               loginName: loginName,
               ipStatus: rateLimitExpiresIn ? "rateLimited" : "OK",
               ...(rateLimitExpiresIn ? { rateLimitExpiresIn } : {}),

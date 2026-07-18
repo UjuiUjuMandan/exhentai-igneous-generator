@@ -321,7 +321,7 @@
         document.getElementById("response-output").textContent = JSON.stringify(data, null, 2);
         document.getElementById("result").hidden = false;
 
-        if (data.accountStatus === "banned") {
+        if (data.accountStatus === "unauthenticated") {
           document.getElementById("copy-output").hidden = true;
           document.getElementById("copy-button").hidden = true;
           document.querySelector("#result > h3").hidden = true;
