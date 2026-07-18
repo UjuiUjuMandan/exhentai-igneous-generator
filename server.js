@@ -16,6 +16,17 @@ const ACCOUNT_SUSPENDED_RE = /This page is currently not available, as your acco
 const EXHENTAI_BROWSING_COUNTRY_RE = /<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/;
 const EHENTAI_BROWSING_COUNTRY_RE = /<p>You appear to be located in <strong>(.*?)<\/strong>/;
 
+const FORWARDED_CLIENT_HEADERS = ["user-agent", "accept-language"];
+
+function clientHeaders(req) {
+  const result = {};
+  for (const name of FORWARDED_CLIENT_HEADERS) {
+    const value = req.headers[name];
+    if (value) result[name] = value;
+  }
+  return result;
+}
+
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -37,7 +48,7 @@ app.all('/api', async (req, res) => {
     }
 
     const cookie = `ipb_member_id=${ipbMemberId}; ipb_pass_hash=${ipbPassHash}`;
-    const headers = { Cookie: cookie };
+    const headers = { ...clientHeaders(req), Cookie: cookie };
 
     const forumsUrl = "https://forums.e-hentai.org";
     const forumsResponse = await fetch(forumsUrl, { headers });
