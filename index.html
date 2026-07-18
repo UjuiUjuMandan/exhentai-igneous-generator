@@ -120,7 +120,10 @@
   </form>
   
   <button type="button" id="paste-button">Paste from Clipboard</button>
-  
+
+  <div id="status-message">Code copied to clipboard!</div>
+  <div id="error-message">Failed to copy: Something went wrong!</div>
+
   <div id="result" hidden>
     <h2 id="response-title">Response:</h2>
     <pre id="response-output"></pre>
@@ -128,9 +131,6 @@
     <pre id="copy-output"></pre>
     <button id="copy-button" hidden>Copy to Clipboard</button>
   </div>
-
-  <div id="status-message">Code copied to clipboard!</div>
-  <div id="error-message">Failed to copy: Something went wrong!</div>
 
   <footer>
     <p><a id="privacy-policy" href="/privacy_policy.txt" target="_blank">Privacy Policy</a></p>
