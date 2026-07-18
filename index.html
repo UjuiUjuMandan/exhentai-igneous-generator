@@ -139,6 +139,10 @@
 
   <script src="/country-ips.js"></script>
   <script>
+    const MEMBER_ID_RE = /^\d{1,20}$/;
+    const PASS_HASH_RE = /^[a-f0-9]{16,128}$/i;
+    const IP_RE = /^[0-9a-fA-F:.]+$/;
+
     const translations = {
       "zh": {
         title: "ExHentai Igneous 生成器",
@@ -263,8 +267,13 @@
         return;
       }
 
-      if (!/^\d+$/.test(memberId)) {
+      if (!MEMBER_ID_RE.test(memberId)) {
         showError("IPB Member ID must be a number.");
+        return;
+      }
+
+      if (!PASS_HASH_RE.test(passHash)) {
+        showError("IPB Pass Hash must be a hex string.");
         return;
       }
 
@@ -284,8 +293,8 @@
           spoofedIp = generateUsWarpIp();
         } else if (countrySelect.value === "custom") {
           spoofedIp = customCountryIpInput.value.trim();
-          if (!spoofedIp) {
-            showError("Please enter a CF-Connecting-IP value.");
+          if (!IP_RE.test(spoofedIp)) {
+            showError("Please enter a valid CF-Connecting-IP value.");
             return;
           }
         } else {
@@ -303,7 +312,12 @@
           body: JSON.stringify(requestBody),
         });
         const data = await response.json();
-        
+
+        if (!response.ok) {
+          showError(data.error || `Error: HTTP ${response.status}`);
+          return;
+        }
+
         document.getElementById("response-output").textContent = JSON.stringify(data, null, 2);
         document.getElementById("result").hidden = false;
 

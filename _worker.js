@@ -11,6 +11,13 @@ const IP_RE = /^[0-9a-fA-F:.]+$/;
 const MEMBER_ID_RE = /^\d{1,20}$/;
 const PASS_HASH_RE = /^[a-f0-9]{16,128}$/i;
 
+function jsonError(message, status, corsHeaders) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -42,23 +49,23 @@ export default {
         } else if (request.method === "OPTIONS") {
           return new Response(null, { status: 204, headers: corsHeaders });
         } else {
-          return new Response("Only GET, POST, and OPTIONS methods are supported", { status: 405, headers: corsHeaders });
+          return jsonError("Only GET, POST, and OPTIONS methods are supported", 405, corsHeaders);
         }
 
         if (!ipbMemberId || !ipbPassHash) {
-          return new Response("Missing required parameters: ipb_member_id and ipb_pass_hash", { status: 400, headers: corsHeaders });
+          return jsonError("Missing required parameters: ipb_member_id and ipb_pass_hash", 400, corsHeaders);
         }
 
         if (!MEMBER_ID_RE.test(ipbMemberId)) {
-          return new Response("Invalid ipb_member_id", { status: 400, headers: corsHeaders });
+          return jsonError("Invalid ipb_member_id", 400, corsHeaders);
         }
 
         if (!PASS_HASH_RE.test(ipbPassHash)) {
-          return new Response("Invalid ipb_pass_hash", { status: 400, headers: corsHeaders });
+          return jsonError("Invalid ipb_pass_hash", 400, corsHeaders);
         }
 
         if (cfConnectingIp && !IP_RE.test(cfConnectingIp)) {
-          return new Response("Invalid cf_connecting_ip", { status: 400, headers: corsHeaders });
+          return jsonError("Invalid cf_connecting_ip", 400, corsHeaders);
         }
 
         const cookie = `ipb_member_id=${ipbMemberId}; ipb_pass_hash=${ipbPassHash}`;
@@ -136,7 +143,7 @@ export default {
           }
         );
       } catch (err) {
-        return new Response(`Error: ${err.message}`, { status: 500, headers: corsHeaders });
+        return jsonError(err.message, 500, corsHeaders);
       }
     }
 
