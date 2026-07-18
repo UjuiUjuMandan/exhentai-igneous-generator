@@ -223,7 +223,7 @@ export default {
                 : accountSuspended
                 ? "suspended"
                 : loggedInMatch || browsingCountry !== "Unknown"
-                ? "OK"
+                ? "not suspended"
                 : "Unknown",
               loginName: loginName,
               ipStatus: rateLimitExpiresIn ? "rateLimited" : "OK",
