@@ -39,6 +39,17 @@ const ACCOUNT_SUSPENDED_RE = /This page is currently not available, as your acco
 const EXHENTAI_BROWSING_COUNTRY_RE = /<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/;
 const EHENTAI_BROWSING_COUNTRY_RE = /<p>You appear to be located in <strong>(.*?)<\/strong>/;
 
+const FORWARDED_CLIENT_HEADERS = ["User-Agent", "Accept-Language"];
+
+function clientHeaders(request) {
+  const result = {};
+  for (const name of FORWARDED_CLIENT_HEADERS) {
+    const value = request.headers.get(name);
+    if (value) result[name] = value;
+  }
+  return result;
+}
+
 function jsonError(message, status, corsHeaders) {
   return new Response(JSON.stringify({ error: message }), {
     status,
@@ -97,7 +108,7 @@ export default {
         }
 
         const cookie = `ipb_member_id=${ipbMemberId}; ipb_pass_hash=${ipbPassHash}`;
-        const headers = new Headers();
+        const headers = new Headers(clientHeaders(request));
         headers.set("Cookie", cookie);
 
         const forumsUrl = "https://forums.e-hentai.org";
@@ -154,7 +165,7 @@ export default {
         // to spoof any country. /uconfig.php alone sets igneous (and the rest
         // of the account cookies) and reports the browsing country, so one
         // request covers both - no need to also hit "/".
-        const directHeaders = { Cookie: cookie };
+        const directHeaders = { ...clientHeaders(request), Cookie: cookie };
         if (cfConnectingIp) directHeaders["CF-Connecting-IP"] = cfConnectingIp;
 
         async function queryExhentai() {
