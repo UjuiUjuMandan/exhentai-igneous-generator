@@ -30,6 +30,8 @@ const EHENTAI_ORIGIN_IPS = [
 ];
 
 const RATE_LIMIT_RE = /This IP address has been temporarily banned due to an excessive request rate\..*?The ban expires in (.*?)$/;
+const GUEST_RE = /<p class="pcen"><b>Welcome Guest<\/b>/;
+const LOGGED_IN_RE = /<p class="home"><b>Logged in as:\s*<a[^>]*>(.*?)<\/a>/;
 const ACCOUNT_BAN_RE =
   /<div class="errorwrap">\s*<h4>The error returned was:<\/h4>\s*<p>Your account has been temporarily suspended\. This suspension is due to end on (.*?)\.<\/p>/;
 const EXHENTAI_BROWSING_COUNTRY_RE = /<p>You appear to be browsing the site from <strong>(.*?)<\/strong>/;
@@ -101,6 +103,25 @@ export default {
         const forumsResponse = await fetch(forumsUrl, { method: "GET", headers });
         const forumsHtml = await forumsResponse.text();
 
+        const loggedInMatch = forumsHtml.match(LOGGED_IN_RE);
+
+        if (!loggedInMatch && GUEST_RE.test(forumsHtml)) {
+          return new Response(
+            JSON.stringify(
+              {
+                accountStatus: "unauthenticated",
+              },
+              null,
+              2
+            ),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            }
+          );
+        }
+
+        const loginName = loggedInMatch ? loggedInMatch[1] : undefined;
         const banMatch = forumsHtml.match(ACCOUNT_BAN_RE);
 
         if (banMatch) {
@@ -110,6 +131,7 @@ export default {
             JSON.stringify(
               {
                 accountStatus: "banned",
+                loginName: loginName,
                 banEndDate: banEndDate,
               },
               null,
@@ -186,7 +208,8 @@ export default {
         return new Response(
           JSON.stringify(
             {
-              accountStatus: "Unknown",
+              accountStatus: loggedInMatch ? "OK" : "Unknown",
+              loginName: loginName,
               ipStatus: rateLimitExpiresIn ? "rateLimited" : "OK",
               ...(rateLimitExpiresIn ? { rateLimitExpiresIn } : {}),
               headers: headersObject,
