@@ -123,7 +123,7 @@ export async function index(context, req) {
         : accountSuspended
         ? "suspended"
         : loggedInMatch || browsingCountry !== "Unknown"
-        ? "OK"
+        ? "not suspended"
         : "Unknown",
       loginName: loginName,
       ipStatus: rateLimitExpiresIn ? "rateLimited" : "OK",
