@@ -119,7 +119,7 @@ app.all('/api', async (req, res) => {
         : accountSuspended
         ? "suspended"
         : loggedInMatch || browsingCountry !== "Unknown"
-        ? "OK"
+        ? "not suspended"
         : "Unknown",
       loginName: loginName,
       ipStatus: rateLimitExpiresIn ? "rateLimited" : "OK",
