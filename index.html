@@ -298,7 +298,7 @@
             return;
           }
         } else {
-          spoofedIp = countrySelect.value;
+          spoofedIp = randomizeHostBits(countrySelect.value);
         }
         requestBody.cf_connecting_ip = spoofedIp;
       }
