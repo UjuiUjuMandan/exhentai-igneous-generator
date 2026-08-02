@@ -161,7 +161,7 @@ export default {
         // always shows Cloudflare's own (UK) CF-Connecting-IP to the origin,
         // overwriting anything we set. So this bypasses fetch() entirely:
         // connect() straight to the origin (s.exhentai.org) and speak TLS +
-        // HTTP/1.1 ourselves, which lets us set an arbitrary CF-Connecting-IP
+        // HTTP/2 ourselves, which lets us set an arbitrary CF-Connecting-IP
         // to spoof any country. /uconfig.php alone sets igneous (and the rest
         // of the account cookies) and reports the browsing country, so one
         // request covers both - no need to also hit "/".

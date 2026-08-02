@@ -156,7 +156,8 @@ export class LazyReadFunctionReadQueue extends ReadQueue {
       }
       if (data.length > 0) this.enqueue(data);
     }
-    const data = await super.read(bytes, readMode) as Uint8ArrayWithFetchPoints;
+    const data = await super.read(bytes, readMode) as Uint8ArrayWithFetchPoints | undefined;
+    if (data === undefined) return undefined; // connection closed with fewer than `bytes` left
     data.fetchPoints = fetchPoints;
     return data;
   }
