@@ -262,12 +262,42 @@ export default {
         .on("option[data-cloud-run-api]", new SetAPI(env.CLOUD_RUN_API))
         .on("option[data-aws-lambda-api]", new SetAPI(env.AWS_LAMBDA_API))
         .on("option[data-azure-func-api]", new SetAPI(env.AZURE_FUNC_API))
+        .on("html", new SetCommitSha(env.CF_PAGES_COMMIT_SHA))
+        .on("#source-code-link", new SetSourceLink(env.CF_PAGES_COMMIT_SHA))
         .transform(response);
     }
     
     return env.ASSETS.fetch(request);
   },
 };
+
+class SetCommitSha {
+  constructor(commitSha) {
+    this.commitSha = commitSha;
+  }
+
+  element(element) {
+    if (this.commitSha) {
+      element.setAttribute("data-commit-sha", this.commitSha);
+    }
+  }
+}
+
+class SetSourceLink {
+  constructor(commitSha) {
+    this.commitSha = commitSha;
+  }
+
+  element(element) {
+    if (this.commitSha) {
+      element.setAttribute(
+        "href",
+        `https://github.com/UjuiUjuMandan/exhentai-igneous-generator/tree/${this.commitSha}`
+      );
+      element.setInnerContent(this.commitSha.slice(0, 7));
+    }
+  }
+}
 
 class SetAPI {
   constructor(newAPI) {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-commit-sha="">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -133,8 +133,7 @@
   </div>
 
   <footer>
-    <p><a id="privacy-policy" href="/privacy_policy.txt" target="_blank">Privacy Policy</a></p>
-    <p id="source-code">Source code available on <a href="https://github.com/UjuiUjuMandan/exhentai-igneous-generator" target="_blank">GitHub</a></p>
+    <p><a id="source-code-link" href="https://github.com/UjuiUjuMandan/exhentai-igneous-generator" target="_blank">GitHub</a> | <a id="privacy-policy" href="/privacy_policy.txt" target="_blank">Privacy Policy</a></p>
   </footer>
 
   <script src="/country-ips.js"></script>
@@ -155,7 +154,6 @@
         statusMessage: "代码已复制到剪贴板！",
         errorMessage: "复制失败：发生错误！",
         privacyPolicy: "隐私政策",
-        sourceCode: "源代码在",
         countryLabel: "CF-Connecting-IP",
         countryDefault: "无"
       },
@@ -170,7 +168,6 @@
         statusMessage: "Code copied to clipboard!",
         errorMessage: "Failed to copy: Something went wrong!",
         privacyPolicy: "Privacy Policy",
-        sourceCode: "Source code available on",
         countryLabel: "CF-Connecting-IP",
         countryDefault: "None"
       }
@@ -189,7 +186,12 @@
       document.getElementById("status-message").textContent = translations[lang].statusMessage;
       document.getElementById("error-message").textContent = translations[lang].errorMessage;
       document.getElementById("privacy-policy").textContent = translations[lang].privacyPolicy;
-      document.getElementById("source-code").innerHTML = `${translations[lang].sourceCode} <a href="https://github.com/UjuiUjuMandan/exhentai-igneous-generator" target="_blank">GitHub</a>`;
+      const commitSha = document.documentElement.dataset.commitSha;
+      const sourceLink = document.getElementById("source-code-link");
+      if (commitSha) {
+        sourceLink.href = `https://github.com/UjuiUjuMandan/exhentai-igneous-generator/tree/${commitSha}`;
+        sourceLink.textContent = commitSha.slice(0, 7);
+      }
       document.getElementById("country-label").textContent = translations[lang].countryLabel;
       document.getElementById("country-default-option").textContent = translations[lang].countryDefault;
     };
