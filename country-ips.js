@@ -566,7 +566,7 @@ const COUNTRY_IPS = {
 };
 
 // Country -> ISO 3166-1 alpha-2 code, matching the two-letter class each land
-// path carries in world-map.svg (e.g. class="landxx pk"). The scanner uses
+// path carries in BlankMap-World.svg (e.g. class="landxx pk"). The scanner uses
 // this to colour the map by each country's result.
 const COUNTRY_CODE = {
   "Afghanistan": "af",

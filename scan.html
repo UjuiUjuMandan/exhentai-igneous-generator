@@ -271,7 +271,7 @@
       if (mapSvg) return mapSvg;
       if (!mapLoadPromise) {
         mapLoadPromise = (async () => {
-          const res = await fetch("/world-map.svg");
+          const res = await fetch("/BlankMap-World.svg");
           if (!res.ok) throw new Error(`map HTTP ${res.status}`);
           mapContainer.innerHTML = await res.text();
           mapSvg = mapContainer.querySelector("svg");
