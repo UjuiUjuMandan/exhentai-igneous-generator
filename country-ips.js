@@ -58,6 +58,7 @@ const US_RANDOM_SENTINEL = "__US_WARP_RANDOM__";
 // BROWSING_COUNTRY list so it matches uconfig.php's country strings.
 const COUNTRY_ZH = {
   "Afghanistan": "阿富汗",
+  "Aland Islands": "奥兰群岛",
   "Albania": "阿尔巴尼亚",
   "Algeria": "阿尔及利亚",
   "American Samoa": "美属萨摩亚",
@@ -86,6 +87,7 @@ const COUNTRY_ZH = {
   "Bonaire Saint Eustatius and Saba": "博内尔、圣尤斯特歇斯和萨巴",
   "Bosnia and Herzegovina": "波斯尼亚和黑塞哥维那",
   "Botswana": "博茨瓦纳",
+  "Bouvet Island": "布维岛",
   "Brazil": "巴西",
   "British Indian Ocean Territory": "英属印度洋领地",
   "Brunei Darussalam": "文莱",
@@ -267,6 +269,7 @@ const COUNTRY_ZH = {
   "Sri Lanka": "斯里兰卡",
   "Sudan": "苏丹",
   "Suriname": "苏里南",
+  "Svalbard and Jan Mayen": "斯瓦尔巴和扬马延",
   "Swaziland": "斯威士兰",
   "Sweden": "瑞典",
   "Switzerland": "瑞士",
@@ -290,6 +293,7 @@ const COUNTRY_ZH = {
   "United Arab Emirates": "阿拉伯联合酋长国",
   "United Kingdom": "英国",
   "United States": "美国",
+  "United States Minor Outlying Islands": "美国本土外小岛屿",
   "Uruguay": "乌拉圭",
   "Uzbekistan": "乌兹别克斯坦",
   "Vanuatu": "瓦努阿图",
@@ -311,6 +315,7 @@ const COUNTRY_ZH = {
 // (confirmed against exhentai.org/uconfig.php).
 const COUNTRY_IPS = {
   "Afghanistan": "23.88.192.0/24",
+  "Aland Islands": "185.84.31.0/24",
   "Albania": "185.173.204.0/24",
   "Algeria": "41.96.0.0/24",
   "American Samoa": "103.117.168.0/24",
@@ -339,6 +344,7 @@ const COUNTRY_IPS = {
   "Bonaire Saint Eustatius and Saba": "143.0.32.0/24",
   "Bosnia and Herzegovina": "5.43.64.0/24",
   "Botswana": "41.74.48.0/24",
+  "Bouvet Island": "103.102.229.0/24",
   "Brazil": "24.152.0.0/24",
   "British Indian Ocean Territory": "202.44.112.0/24",
   "Brunei Darussalam": "43.225.40.0/24",
@@ -520,6 +526,7 @@ const COUNTRY_IPS = {
   "Sri Lanka": "43.224.124.0/24",
   "Sudan": "41.67.0.0/24",
   "Suriname": "45.68.20.0/24",
+  "Svalbard and Jan Mayen": "212.105.148.0/23",
   "Swaziland": "41.77.232.0/24",
   "Sweden": "185.166.254.0/24",
   "Switzerland": "195.8.203.0/24",
@@ -543,6 +550,7 @@ const COUNTRY_IPS = {
   "United Arab Emirates": "2a09:3280::/64",
   "United Kingdom": "45.114.220.0/24",
   "United States": "34.4.6.0/24",
+  "United States Minor Outlying Islands": "179.64.24.0/23",
   "Uruguay": "138.99.44.0/24",
   "Uzbekistan": "5.133.120.0/24",
   "Vanuatu": "103.7.197.0/24",
