@@ -90,11 +90,12 @@ export default {
         return jsonError("Only POST and OPTIONS methods are supported", 405, corsHeaders);
       }
 
-      let ipbMemberId, ipbPassHash;
+      let ipbMemberId, ipbPassHash, turnstileToken;
       try {
         const body = await request.json();
         ipbMemberId = body.ipb_member_id;
         ipbPassHash = body.ipb_pass_hash;
+        turnstileToken = body.turnstile_token;
       } catch {
         return jsonError("Invalid JSON body", 400, corsHeaders);
       }
@@ -107,6 +108,34 @@ export default {
       }
       if (!PASS_HASH_RE.test(ipbPassHash)) {
         return jsonError("Invalid ipb_pass_hash", 400, corsHeaders);
+      }
+
+      // Turnstile gate: a scan fires hundreds of origin requests, so require a
+      // human-verified token before doing any of that work. Verified server-
+      // side against Cloudflare's siteverify with the secret from the Pages
+      // env; the token is single-use, so the frontend resets the widget after
+      // each scan.
+      if (env.TURNSTILE_SECRET_KEY) {
+        if (!turnstileToken) {
+          return jsonError("Missing Turnstile token", 400, corsHeaders);
+        }
+        const form = new FormData();
+        form.append("secret", env.TURNSTILE_SECRET_KEY);
+        form.append("response", turnstileToken);
+        const clientIp = request.headers.get("CF-Connecting-IP");
+        if (clientIp) form.append("remoteip", clientIp);
+        try {
+          const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            method: "POST",
+            body: form,
+          });
+          const verify = await verifyRes.json();
+          if (!verify.success) {
+            return jsonError("Turnstile verification failed", 403, corsHeaders);
+          }
+        } catch (err) {
+          return jsonError("Turnstile verification error: " + err.message, 502, corsHeaders);
+        }
       }
 
       const cookie = `ipb_member_id=${ipbMemberId}; ipb_pass_hash=${ipbPassHash}`;

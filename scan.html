@@ -11,6 +11,7 @@
   <meta property="og:site_name" content="ExHentai Igneous Generator">
   <meta property="og:locale" content="en_US">
   <title id="title">ExHentai Igneous Country Scanner</title>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -135,6 +136,8 @@
     <input type="text" id="ipb_pass_hash" name="ipb_pass_hash" placeholder="ipb_pass_hash" required>
     <button type="button" id="paste-button">Paste from Clipboard</button>
   </form>
+
+  <div id="turnstile-widget" class="cf-turnstile" data-sitekey="0x4AAAAAAEPvfFXqs_zpMXwX" data-action="turnstile-spin-v1"></div>
 
   <div id="controls">
     <button type="button" id="scan-button" style="margin-bottom:0;">Start Scan</button>
@@ -423,6 +426,11 @@
       const memberId = memberIdField.value = memberIdMatch[0];
       const passHash = passHashField.value = passHashMatch[0];
 
+      // Turnstile token (single-use). Read it before firing the scan so we fail
+      // fast if the challenge hasn't been solved.
+      const turnstileToken = window.turnstile ? window.turnstile.getResponse() : "";
+      if (!turnstileToken) return showError("Please complete the Turnstile challenge first.");
+
       scanning = true;
       scanButton.disabled = true;
       stopButton.style.display = "block";
@@ -441,7 +449,7 @@
         const res = await fetch("/api/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ipb_member_id: memberId, ipb_pass_hash: passHash }),
+          body: JSON.stringify({ ipb_member_id: memberId, ipb_pass_hash: passHash, turnstile_token: turnstileToken }),
           signal: abortController.signal,
         });
         if (!res.ok) {
@@ -516,6 +524,9 @@
         scanButton.disabled = false;
         stopButton.style.display = "none";
         abortController = null;
+        // The token is single-use - reset the widget so the next scan gets a
+        // fresh one.
+        if (window.turnstile) window.turnstile.reset();
       }
     });
 
