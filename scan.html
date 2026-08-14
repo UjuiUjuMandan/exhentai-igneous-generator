@@ -273,18 +273,24 @@
         mapLoadPromise = (async () => {
           const res = await fetch("/BlankMap-World.svg");
           if (!res.ok) throw new Error(`map HTTP ${res.status}`);
-          mapContainer.innerHTML = await res.text();
-          mapSvg = mapContainer.querySelector("svg");
-          // The source SVG sets fixed width/height but no viewBox, so scaling
-          // it down with CSS just clips to the top-left. Give it a viewBox from
-          // its native dimensions and drop the fixed size so it scales to fit.
-          if (mapSvg && !mapSvg.getAttribute("viewBox")) {
-            const w = mapSvg.getAttribute("width") || 2754;
-            const h = mapSvg.getAttribute("height") || 1398;
-            mapSvg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-            mapSvg.removeAttribute("width");
-            mapSvg.removeAttribute("height");
+          // Parse as SVG (not via innerHTML, which runs the HTML parser and
+          // makes WebKit revalidate the width/height presentation attributes and
+          // log spurious "Invalid value for <svg> attribute" errors).
+          const doc = new DOMParser().parseFromString(await res.text(), "image/svg+xml");
+          const svg = doc.documentElement;
+          // The source SVG sets fixed width/height but no viewBox, so scaling it
+          // down with CSS just clips to the top-left. Derive a viewBox from the
+          // native size, then hand sizing over to CSS with width/height=100%
+          // (rather than removing them, which WebKit also flags).
+          if (!svg.getAttribute("viewBox")) {
+            const w = svg.getAttribute("width") || 2754;
+            const h = svg.getAttribute("height") || 1398;
+            svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
           }
+          svg.setAttribute("width", "100%");
+          svg.setAttribute("height", "100%");
+          mapContainer.replaceChildren(document.importNode(svg, true));
+          mapSvg = mapContainer.querySelector("svg");
           return mapSvg;
         })();
       }
