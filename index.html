@@ -139,8 +139,8 @@
 
   <script src="/country-ips.js"></script>
   <script>
-    const MEMBER_ID_RE = /^\d{1,20}$/;
-    const PASS_HASH_RE = /^[a-f0-9]{16,128}$/i;
+    const MEMBER_ID_RE = /\d{1,20}/;
+    const PASS_HASH_RE = /[a-f0-9]{16,128}/i;
     const IP_RE = /^[0-9a-fA-F:.]+$/;
 
     const translations = {
@@ -262,23 +262,28 @@
     updateCountrySelectAvailability();
 
     document.getElementById("submit-button").addEventListener("click", async () => {
-      const memberId = document.getElementById("ipb_member_id").value;
-      const passHash = document.getElementById("ipb_pass_hash").value;
+      const memberIdField = document.getElementById("ipb_member_id");
+      const passHashField = document.getElementById("ipb_pass_hash");
+      const memberIdMatch = memberIdField.value.match(MEMBER_ID_RE);
+      const passHashMatch = passHashField.value.match(PASS_HASH_RE);
 
-      if (!memberId || !passHash) {
+      if (!memberIdField.value || !passHashField.value) {
         showError("Please fill in both fields.");
         return;
       }
 
-      if (!MEMBER_ID_RE.test(memberId)) {
+      if (!memberIdMatch) {
         showError("IPB Member ID must be a number.");
         return;
       }
 
-      if (!PASS_HASH_RE.test(passHash)) {
+      if (!passHashMatch) {
         showError("IPB Pass Hash must be a hex string.");
         return;
       }
+
+      const memberId = memberIdField.value = memberIdMatch[0];
+      const passHash = passHashField.value = passHashMatch[0];
 
       let url = endpointSelect.value;
       if (url === "custom") {
