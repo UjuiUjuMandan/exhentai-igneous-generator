@@ -81,6 +81,42 @@
       font-family: monospace;
       word-break: break-all;
     }
+    #map-wrap {
+      margin-top: 1.5em;
+    }
+    #map-container {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid #ccc;
+      background: #eaf3fb;
+    }
+    #map-container svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    #map-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.2em;
+      margin-bottom: 0.6em;
+      font-size: 0.9em;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+    .swatch {
+      display: inline-block;
+      width: 1em;
+      height: 1em;
+      border: 1px solid #999;
+    }
+    .swatch-hit { background: #2e9e46; }
+    .swatch-mystery { background: #e3b100; }
+    .swatch-failed { background: #d9433c; }
+    .swatch-pending { background: #c0c0c0; }
     footer {
       margin-top: 2em;
       text-align: center;
@@ -108,6 +144,16 @@
   <div id="error-message"></div>
   <div id="progress" hidden></div>
 
+  <div id="map-wrap" hidden>
+    <div id="map-legend">
+      <span class="legend-item"><span class="swatch swatch-hit"></span><span id="legend-hit">Real igneous</span></span>
+      <span class="legend-item"><span class="swatch swatch-mystery"></span><span id="legend-mystery">mystery / deleted</span></span>
+      <span class="legend-item"><span class="swatch swatch-failed"></span><span id="legend-failed">Failed</span></span>
+      <span class="legend-item"><span class="swatch swatch-pending"></span><span id="legend-pending">Not scanned</span></span>
+    </div>
+    <div id="map-container"></div>
+  </div>
+
   <table id="results-table" hidden>
     <thead>
       <tr>
@@ -129,7 +175,7 @@
   </footer>
 
   <script type="module">
-    import { COUNTRY_ZH, COUNTRY_IPS } from "/country-ips.js";
+    import { COUNTRY_ZH, COUNTRY_IPS, COUNTRY_CODE } from "/country-ips.js";
 
     const MEMBER_ID_RE = /\d{1,20}/;
     const PASS_HASH_RE = /[a-f0-9]{16,128}/i;
@@ -150,6 +196,10 @@
         thIgneous: "igneous",
         homeLink: "首页",
         privacyPolicy: "隐私政策",
+        legendHit: "有效 igneous",
+        legendMystery: "mystery / deleted",
+        legendFailed: "失败",
+        legendPending: "未扫描",
       },
       en: {
         title: "ExHentai Igneous Country Scanner",
@@ -164,6 +214,10 @@
         thIgneous: "igneous",
         homeLink: "Home",
         privacyPolicy: "Privacy Policy",
+        legendHit: "Real igneous",
+        legendMystery: "mystery / deleted",
+        legendFailed: "Failed",
+        legendPending: "Not scanned",
       },
     };
 
@@ -180,6 +234,10 @@
     document.getElementById("th-igneous").textContent = t.thIgneous;
     document.getElementById("home-link").textContent = t.homeLink;
     document.getElementById("privacy-policy").textContent = t.privacyPolicy;
+    document.getElementById("legend-hit").textContent = t.legendHit;
+    document.getElementById("legend-mystery").textContent = t.legendMystery;
+    document.getElementById("legend-failed").textContent = t.legendFailed;
+    document.getElementById("legend-pending").textContent = t.legendPending;
     (() => {
       const commitSha = document.documentElement.dataset.commitSha;
       if (commitSha) {
@@ -195,6 +253,61 @@
     const bodyEl = document.getElementById("results-body");
     const scanButton = document.getElementById("scan-button");
     const stopButton = document.getElementById("stop-button");
+    const mapWrap = document.getElementById("map-wrap");
+    const mapContainer = document.getElementById("map-container");
+
+    // Fill colours per result state, keyed to the legend swatches.
+    const STATE_FILL = {
+      hit: "#2e9e46",
+      mystery: "#e3b100",
+      failed: "#d9433c",
+      pending: "#c0c0c0",
+    };
+
+    // The inline world map, loaded once and reused across scans.
+    let mapSvg = null;
+    let mapLoadPromise = null;
+    async function loadMap() {
+      if (mapSvg) return mapSvg;
+      if (!mapLoadPromise) {
+        mapLoadPromise = (async () => {
+          const res = await fetch("/world-map.svg");
+          if (!res.ok) throw new Error(`map HTTP ${res.status}`);
+          mapContainer.innerHTML = await res.text();
+          mapSvg = mapContainer.querySelector("svg");
+          // The source SVG sets fixed width/height but no viewBox, so scaling
+          // it down with CSS just clips to the top-left. Give it a viewBox from
+          // its native dimensions and drop the fixed size so it scales to fit.
+          if (mapSvg && !mapSvg.getAttribute("viewBox")) {
+            const w = mapSvg.getAttribute("width") || 2754;
+            const h = mapSvg.getAttribute("height") || 1398;
+            mapSvg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+            mapSvg.removeAttribute("width");
+            mapSvg.removeAttribute("height");
+          }
+          return mapSvg;
+        })();
+      }
+      return mapLoadPromise;
+    }
+
+    // Paints every land path for a country (selected by its ISO alpha-2 class)
+    // in the colour for its state. Inline fill overrides the SVG's own styles.
+    function colorCountry(country, state) {
+      if (!mapSvg) return;
+      const code = COUNTRY_CODE[country];
+      if (!code) return;
+      const fill = STATE_FILL[state] || STATE_FILL.pending;
+      for (const path of mapSvg.querySelectorAll("." + code)) {
+        path.style.fill = fill;
+      }
+    }
+
+    // At the start of a scan, grey out just the countries we're about to probe.
+    function resetMap() {
+      if (!mapSvg) return;
+      for (const country of Object.keys(COUNTRY_IPS)) colorCountry(country, "pending");
+    }
 
     function showError(msg) {
       errorEl.textContent = msg;
@@ -249,6 +362,7 @@
         rec.state = "failed";
       }
       renderRow(rec);
+      colorCountry(rec.country, rec.state);
     }
 
     function renderRow(rec) {
@@ -363,6 +477,14 @@
             } else if (msg.type === "ready") {
               total = msg.total ?? total;
               buildRows();
+              try {
+                await loadMap();
+                resetMap();
+                mapWrap.hidden = false;
+              } catch (e) {
+                // Map is a nice-to-have; the table still works without it.
+                console.warn("map load failed:", e);
+              }
               progressEl.textContent = `0 / ${total}`;
             } else if (msg.type === "result") {
               const rec = byCountry.get(msg.country);
