@@ -196,11 +196,17 @@ export default {
             return;
           }
 
-          // One TLS+HTTP/2 connection to the origin, reused across every
+          // Two persistent TLS+HTTP/2 connections, each reused across every
           // country as separate multiplexed streams. CF-Connecting-IP is a
           // per-request header, so each stream can spoof a different country
-          // over the single connection - no per-country handshake.
-          let session;
+          // over the one connection - no per-country handshake.
+          //   - exhentai (s.exhentai.org): the real probe, sets igneous and
+          //     usually reports the browsing country.
+          //   - e-hentai: a fallback used only when exhentai withholds the
+          //     country (which happens on the same responses that hand back a
+          //     "mystery" igneous). e-hentai still resolves the geo for the
+          //     spoofed IP, so we can fill the column in from there.
+          let session, ehentaiSession;
           try {
             session = await openDirectHttpsSession({
               origin: url.origin,
@@ -212,6 +218,34 @@ export default {
             send({ type: "error", message: "Failed to open origin connection: " + err.message });
             controller.close();
             return;
+          }
+          try {
+            const ehentaiIp = EHENTAI_ORIGIN_IPS[Math.floor(Math.random() * EHENTAI_ORIGIN_IPS.length)];
+            ehentaiSession = await openDirectHttpsSession({
+              origin: url.origin,
+              connectHost: ehentaiIp,
+              hostHeader: "e-hentai.org",
+              sniHost: "e-hentai.org",
+            });
+          } catch {
+            // Non-fatal: the scan still works, mystery rows just keep Unknown.
+            ehentaiSession = null;
+          }
+
+          // Fallback country lookup on e-hentai for the same spoofed IP, used
+          // when exhentai didn't report one.
+          async function ehentaiCountry(spoofedIp) {
+            if (!ehentaiSession) return undefined;
+            try {
+              const res = await ehentaiSession.request({
+                path: "/uconfig.php",
+                headers: { ...baseHeaders, Cookie: cookie, "CF-Connecting-IP": spoofedIp },
+              });
+              const m = res.body.match(EHENTAI_BROWSING_COUNTRY_RE);
+              return m ? m[1] : undefined;
+            } catch {
+              return undefined;
+            }
           }
 
           async function probeCountry(country) {
@@ -230,13 +264,17 @@ export default {
               const igneousMatch = setCookie.match(IGNEOUS_RE);
               const igneous = igneousMatch ? igneousMatch[1] : "null";
               const countryMatch = res.body.match(EHENTAI_BROWSING_COUNTRY_RE);
+              let browsingCountry = countryMatch ? countryMatch[1] : undefined;
+              // exhentai withholds the country on the same responses that give a
+              // "mystery" igneous - fall back to e-hentai for the same IP.
+              if (!browsingCountry) browsingCountry = await ehentaiCountry(spoofedIp);
               return {
                 type: "result",
                 country,
                 spoofedIp,
                 status: "ok",
                 igneous,
-                browsingCountry: countryMatch ? countryMatch[1] : "Unknown",
+                browsingCountry: browsingCountry || "Unknown",
               };
             } catch (err) {
               return { type: "result", country, spoofedIp, status: "error", message: err.message };
@@ -259,6 +297,7 @@ export default {
             send({ type: "error", message: err.message });
           } finally {
             try { await session.close(); } catch {}
+            try { if (ehentaiSession) await ehentaiSession.close(); } catch {}
             controller.close();
           }
         },
