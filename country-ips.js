@@ -564,3 +564,13 @@ const COUNTRY_IPS = {
   "Zambia": "41.63.0.0/24",
   "Zimbabwe": "41.57.64.0/24",
 };
+
+// ES module: the Worker imports these for the server-side country scan
+// (_worker.js), and both browser pages import them from <script type="module">.
+export {
+  randomizeHostBits,
+  generateUsWarpIp,
+  US_RANDOM_SENTINEL,
+  COUNTRY_ZH,
+  COUNTRY_IPS,
+};

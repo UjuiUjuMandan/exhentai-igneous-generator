@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en" data-commit-sha="">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="title">ExHentai Igneous Country Scanner</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2em;
+      line-height: 1.6;
+    }
+    input, button, select {
+      padding: 0.5em;
+      margin-bottom: 1em;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:disabled {
+      background-color: #999;
+      cursor: not-allowed;
+    }
+    #controls {
+      display: flex;
+      gap: 1em;
+      align-items: center;
+    }
+    #controls > * {
+      margin-bottom: 0;
+    }
+    #progress {
+      margin: 1em 0;
+      font-weight: bold;
+    }
+    #error-message {
+      margin: 1em 0;
+      padding: 1em;
+      border: 1px solid #ccc;
+      background-color: #f8d7da;
+      color: #721c24;
+      display: none;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1em;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.4em 0.6em;
+      text-align: left;
+      font-size: 0.9em;
+    }
+    th {
+      background-color: #f4f4f4;
+      cursor: pointer;
+      position: sticky;
+      top: 0;
+    }
+    tr.pending td { color: #999; }
+    tr.hit { background-color: #d4edda; }
+    tr.mystery { background-color: #fff3cd; }
+    tr.failed { background-color: #f8d7da; }
+    .igneous-val {
+      font-family: monospace;
+      word-break: break-all;
+    }
+    footer {
+      margin-top: 2em;
+      text-align: center;
+      color: #666;
+    }
+    footer a { color: #666; text-decoration: underline; }
+    footer a:hover { color: #007BFF; }
+  </style>
+</head>
+<body>
+  <h1 id="main-title">ExHentai Igneous Country Scanner</h1>
+  <p id="intro">Scans every country's CF-Connecting-IP and reports the igneous each one returns. Checks the account is alive before scanning so no time is wasted on a banned account.</p>
+
+  <form id="cred-form">
+    <input type="text" id="ipb_member_id" name="ipb_member_id" placeholder="ipb_member_id" required>
+    <input type="text" id="ipb_pass_hash" name="ipb_pass_hash" placeholder="ipb_pass_hash" required>
+    <button type="button" id="paste-button">Paste from Clipboard</button>
+  </form>
+
+  <div id="controls">
+    <button type="button" id="scan-button" style="margin-bottom:0;">Start Scan</button>
+    <button type="button" id="stop-button" style="margin-bottom:0;display:none;background-color:#dc3545;">Stop</button>
+  </div>
+
+  <div id="error-message"></div>
+  <div id="progress" hidden></div>
+
+  <table id="results-table" hidden>
+    <thead>
+      <tr>
+        <th data-sort="country" id="th-country">Country</th>
+        <th data-sort="ip" id="th-ip">CF-Connecting-IP</th>
+        <th data-sort="country2" id="th-browsing">Browsing Country</th>
+        <th data-sort="igneous" id="th-igneous">igneous</th>
+      </tr>
+    </thead>
+    <tbody id="results-body"></tbody>
+  </table>
+
+  <footer>
+    <p>
+      <a id="home-link" href="/">Home</a> |
+      <a id="source-code-link" href="https://github.com/UjuiUjuMandan/exhentai-igneous-generator" target="_blank">GitHub</a> |
+      <a id="privacy-policy" href="/privacy_policy.txt" target="_blank">Privacy Policy</a>
+    </p>
+  </footer>
+
+  <script type="module">
+    import { COUNTRY_ZH, COUNTRY_IPS } from "/country-ips.js";
+
+    const MEMBER_ID_RE = /\d{1,20}/;
+    const PASS_HASH_RE = /[a-f0-9]{16,128}/i;
+
+    const lang = navigator.language.startsWith("zh") ? "zh" : "en";
+
+    const translations = {
+      zh: {
+        title: "ExHentai Igneous 国家扫描器",
+        mainTitle: "ExHentai Igneous 国家扫描器",
+        intro: "遍历每个国家的 CF-Connecting-IP，列出各国返回的 igneous。",
+        pasteButton: "从剪贴板导入",
+        scanButton: "开始扫描",
+        stopButton: "停止",
+        thCountry: "国家",
+        thIp: "CF-Connecting-IP",
+        thBrowsing: "浏览国家",
+        thIgneous: "igneous",
+        homeLink: "首页",
+        privacyPolicy: "隐私政策",
+      },
+      en: {
+        title: "ExHentai Igneous Country Scanner",
+        mainTitle: "ExHentai Igneous Country Scanner",
+        intro: "Scans every country's CF-Connecting-IP and reports the igneous each one returns.",
+        pasteButton: "Paste from Clipboard",
+        scanButton: "Start Scan",
+        stopButton: "Stop",
+        thCountry: "Country",
+        thIp: "CF-Connecting-IP",
+        thBrowsing: "Browsing Country",
+        thIgneous: "igneous",
+        homeLink: "Home",
+        privacyPolicy: "Privacy Policy",
+      },
+    };
+
+    const t = translations[lang];
+    document.getElementById("title").textContent = t.title;
+    document.getElementById("main-title").textContent = t.mainTitle;
+    document.getElementById("intro").textContent = t.intro;
+    document.getElementById("paste-button").textContent = t.pasteButton;
+    document.getElementById("scan-button").textContent = t.scanButton;
+    document.getElementById("stop-button").textContent = t.stopButton;
+    document.getElementById("th-country").textContent = t.thCountry;
+    document.getElementById("th-ip").textContent = t.thIp;
+    document.getElementById("th-browsing").textContent = t.thBrowsing;
+    document.getElementById("th-igneous").textContent = t.thIgneous;
+    document.getElementById("home-link").textContent = t.homeLink;
+    document.getElementById("privacy-policy").textContent = t.privacyPolicy;
+    (() => {
+      const commitSha = document.documentElement.dataset.commitSha;
+      if (commitSha) {
+        const link = document.getElementById("source-code-link");
+        link.href = `https://github.com/UjuiUjuMandan/exhentai-igneous-generator/tree/${commitSha}`;
+        link.textContent = commitSha.slice(0, 7);
+      }
+    })();
+
+    const errorEl = document.getElementById("error-message");
+    const progressEl = document.getElementById("progress");
+    const tableEl = document.getElementById("results-table");
+    const bodyEl = document.getElementById("results-body");
+    const scanButton = document.getElementById("scan-button");
+    const stopButton = document.getElementById("stop-button");
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.style.display = "block";
+    }
+    function clearError() {
+      errorEl.style.display = "none";
+    }
+
+    document.getElementById("paste-button").addEventListener("click", async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        const m = text.match(/ipb_member_id:\s*(\d+)\s*ipb_pass_hash:\s*([a-f0-9]+)/i);
+        if (m) {
+          document.getElementById("ipb_member_id").value = m[1];
+          document.getElementById("ipb_pass_hash").value = m[2];
+          clearError();
+        } else {
+          showError("Invalid clipboard data format.");
+        }
+      } catch (err) {
+        showError("Failed to read clipboard: " + err.message);
+      }
+    });
+
+    let scanning = false;
+
+    // Row bookkeeping so we can sort after the scan completes.
+    const rows = [];
+
+    function classifyIgneous(igneous) {
+      if (igneous === "mystery" || igneous === "deleted") return "mystery";
+      if (!igneous || igneous === "null") return "failed";
+      return "hit";
+    }
+
+    // Maps one streamed result record to its display state + igneous cell text.
+    function applyResult(rec, msg) {
+      rec.ip = msg.spoofedIp || "";
+      if (msg.status === "ok") {
+        rec.igneous = msg.igneous;
+        rec.browsingCountry = msg.browsingCountry || "";
+        rec.state = classifyIgneous(msg.igneous);
+      } else if (msg.status === "rateLimited") {
+        rec.igneous = "RATE-LIMITED" + (msg.rateLimitExpiresIn ? ` (${msg.rateLimitExpiresIn})` : "");
+        rec.state = "failed";
+      } else if (msg.status === "suspended") {
+        rec.igneous = "SUSPENDED";
+        rec.state = "failed";
+      } else {
+        rec.igneous = "ERR: " + (msg.message || "unknown");
+        rec.state = "failed";
+      }
+      renderRow(rec);
+    }
+
+    function renderRow(rec) {
+      const tr = rec.tr;
+      tr.className = rec.state;
+      tr.innerHTML = "";
+      const label = (lang === "zh" && COUNTRY_ZH[rec.country])
+        ? `${rec.country} (${COUNTRY_ZH[rec.country]})`
+        : rec.country;
+      const cells = [label, rec.ip || "", rec.browsingCountry || "", rec.igneous || ""];
+      for (let i = 0; i < cells.length; i++) {
+        const td = document.createElement("td");
+        if (i === 3) td.className = "igneous-val";
+        td.textContent = cells[i];
+        tr.appendChild(td);
+      }
+    }
+
+    // Builds the full pending table up front (one row per country) so the
+    // streamed results just fill cells in as they arrive.
+    function buildRows() {
+      rows.length = 0;
+      byCountry.clear();
+      bodyEl.innerHTML = "";
+      for (const country of Object.keys(COUNTRY_IPS).sort()) {
+        const tr = document.createElement("tr");
+        tr.className = "pending";
+        const rec = { country, ip: "", browsingCountry: "", igneous: "", state: "pending", tr };
+        const label = (lang === "zh" && COUNTRY_ZH[country])
+          ? `${country} (${COUNTRY_ZH[country]})` : country;
+        tr.innerHTML = `<td>${label}</td><td></td><td></td><td></td>`;
+        bodyEl.appendChild(tr);
+        rows.push(rec);
+        byCountry.set(country, rec);
+      }
+      tableEl.hidden = false;
+    }
+
+    const byCountry = new Map();
+    let abortController = null;
+
+    scanButton.addEventListener("click", async () => {
+      if (scanning) return;
+      clearError();
+
+      const memberIdField = document.getElementById("ipb_member_id");
+      const passHashField = document.getElementById("ipb_pass_hash");
+      const memberIdMatch = memberIdField.value.match(MEMBER_ID_RE);
+      const passHashMatch = passHashField.value.match(PASS_HASH_RE);
+      if (!memberIdMatch) return showError("IPB Member ID must be a number.");
+      if (!passHashMatch) return showError("IPB Pass Hash must be a hex string.");
+      const memberId = memberIdField.value = memberIdMatch[0];
+      const passHash = passHashField.value = passHashMatch[0];
+
+      scanning = true;
+      scanButton.disabled = true;
+      stopButton.style.display = "block";
+      progressEl.hidden = false;
+      progressEl.textContent = "Checking account status...";
+      abortController = new AbortController();
+
+      let total = Object.keys(COUNTRY_IPS).length;
+      let done = 0;
+      let hits = 0;
+
+      try {
+        // One request: the Worker runs the ban pre-check, then multiplexes all
+        // country probes over a single origin connection and streams each
+        // result back as an NDJSON line.
+        const res = await fetch("/api/scan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ipb_member_id: memberId, ipb_pass_hash: passHash }),
+          signal: abortController.signal,
+        });
+        if (!res.ok) {
+          let msg = `HTTP ${res.status}`;
+          try { msg = (await res.json()).error || msg; } catch {}
+          throw new Error(msg);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        for (;;) {
+          const { value, done: streamDone } = await reader.read();
+          if (streamDone) break;
+          buffer += decoder.decode(value, { stream: true });
+          let nl;
+          while ((nl = buffer.indexOf("\n")) >= 0) {
+            const line = buffer.slice(0, nl).trim();
+            buffer = buffer.slice(nl + 1);
+            if (!line) continue;
+            const msg = JSON.parse(line);
+
+            if (msg.type === "aborted") {
+              if (msg.accountStatus === "suspended") {
+                showError("Account is suspended" + (msg.suspendedUntil ? ` until ${msg.suspendedUntil}.` : ".") + " Scan aborted.");
+              } else if (msg.accountStatus === "rateLimited") {
+                showError("This IP is rate-limited by e-hentai" + (msg.rateLimitExpiresIn ? ` (expires in ${msg.rateLimitExpiresIn})` : "") + ". Try again later. Scan aborted.");
+              } else if (msg.accountStatus === "unconfirmed") {
+                showError("Could not confirm the account is healthy (no browsing country returned - possibly a challenge page or transient error). Scan aborted; try again.");
+              } else {
+                showError("Credentials are not logged in (unauthenticated). Scan aborted.");
+              }
+              progressEl.hidden = true;
+              return;
+            } else if (msg.type === "error") {
+              showError("Server error: " + msg.message);
+              return;
+            } else if (msg.type === "ready") {
+              total = msg.total ?? total;
+              buildRows();
+              progressEl.textContent = `0 / ${total}`;
+            } else if (msg.type === "result") {
+              const rec = byCountry.get(msg.country);
+              if (rec) {
+                applyResult(rec, msg);
+                if (rec.state === "hit") hits++;
+              }
+              done++;
+              progressEl.textContent = `${done} / ${total}`;
+            } else if (msg.type === "done") {
+              progressEl.textContent = `Done. ${hits} countries returned a real igneous.`;
+            }
+          }
+        }
+      } catch (err) {
+        if (err.name === "AbortError") {
+          progressEl.textContent = `Stopped. Scanned ${done} / ${total}.`;
+        } else {
+          showError("Error: " + err.message);
+        }
+      } finally {
+        scanning = false;
+        scanButton.disabled = false;
+        stopButton.style.display = "none";
+        abortController = null;
+      }
+    });
+
+    stopButton.addEventListener("click", () => {
+      if (abortController) abortController.abort();
+    });
+
+    // Click a header to sort the completed results.
+    let sortDir = 1;
+    let lastSortKey = null;
+    document.querySelectorAll("th[data-sort]").forEach((th, colIdx) => {
+      th.addEventListener("click", () => {
+        if (scanning) return;
+        const key = th.dataset.sort;
+        sortDir = key === lastSortKey ? -sortDir : 1;
+        lastSortKey = key;
+        const keyMap = { country: "country", ip: "ip", country2: "browsingCountry", igneous: "igneous" };
+        const field = keyMap[key];
+        const sorted = [...rows].sort((a, b) =>
+          sortDir * String(a[field]).localeCompare(String(b[field])));
+        bodyEl.innerHTML = "";
+        for (const rec of sorted) {
+          renderRow(rec);
+          bodyEl.appendChild(rec.tr);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
