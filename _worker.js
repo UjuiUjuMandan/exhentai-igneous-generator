@@ -229,7 +229,7 @@ export default {
               const setCookie = res.headers["set-cookie"] || "";
               const igneousMatch = setCookie.match(IGNEOUS_RE);
               const igneous = igneousMatch ? igneousMatch[1] : "null";
-              const countryMatch = res.body.match(EXHENTAI_BROWSING_COUNTRY_RE);
+              const countryMatch = res.body.match(EHENTAI_BROWSING_COUNTRY_RE);
               return {
                 type: "result",
                 country,
