@@ -54,6 +54,106 @@ function generateUsWarpIp() {
 
 const US_RANDOM_SENTINEL = "__US_WARP_RANDOM__";
 
+// Dropdown values for countries whose IP is generated fresh per request rather
+// than randomized inside one fixed probe CIDR. The country name is appended so
+// one sentinel shape covers every Fastly country: "__FASTLY_RANDOM__:Japan".
+const FASTLY_RANDOM_PREFIX = "__FASTLY_RANDOM__:";
+
+// Fastly MASQUE (Firefox VPN) egress ranges, 2a00:8c40:f000::/44 through
+// 2a00:8c40:f2f0::/44. Unlike Cloudflare WARP -- whose announced egress
+// locations exhentai's geo DB ignores entirely, resolving every WARP address
+// to the United States -- these Fastly ranges are geolocated to the country
+// the exit actually advertises, so they can spoof a browsing country.
+//
+// Each entry is the *fixed* part of the third 16-bit group -- the top 12 bits
+// the /44 pins down. The remaining nibble is free and real exits do use it
+// (e.g. a live Japan exit at 2a00:8c40:f1e8:...), so generateFastlyVpnIp()
+// randomizes it; every value 0-f in a block was confirmed to geolocate to that
+// block's country.
+//
+// Scanned against exhentai.org/uconfig.php one prefix at a time (see README).
+// Caveat found during that scan: the geo DB's records don't line up exactly
+// with these /44s. A thin sliver at the very bottom of some blocks -- third
+// group ending in 0 *and* fourth group under roughly 0x0280 -- still resolves
+// to the preceding block's country (2a00:8c40:f0f0:0200:: reads Italy, while
+// 2a00:8c40:f0f0:0300:: and everything above it reads Netherlands). The sliver
+// is only that corner: any nonzero low nibble on the third group clears it
+// regardless of the fourth group, e.g. 2a00:8c40:f0f4:00a4:: is Netherlands.
+// generateFastlyVpnIp() keeps the fourth group in 0x1000-0xffff, well clear of
+// the boundary on either path. Groups 5-8 are unconstrained.
+const FASTLY_VPN_GROUPS = {
+  "United Kingdom": ["f00"],
+  "France": ["f02"],
+  "Germany": ["f03"],
+  "Canada": ["f05", "f1a"],
+  "Austria": ["f08"],
+  "Belgium": ["f09"],
+  "Bulgaria": ["f0a"],
+  "Denmark": ["f0b"],
+  "Finland": ["f0c"],
+  "Ireland": ["f0d"],
+  "Italy": ["f0e"],
+  "Netherlands": ["f0f"],
+  "Portugal": ["f10"],
+  "Spain": ["f11"],
+  "Malaysia": ["f12"],
+  "New Zealand": ["f13"],
+  "Singapore": ["f14"],
+  "Australia": ["f15"],
+  "Thailand": ["f16"],
+  "Chile": ["f17"],
+  "Colombia": ["f18"],
+  "Mexico": ["f19"],
+  "South Africa": ["f1b"],
+  "Sweden": ["f1c"],
+  "Norway": ["f1d"],
+  "Japan": ["f1e"],
+};
+
+// Builds a random Fastly MASQUE address that exhentai geolocates to `country`.
+// Picks one of that country's /44 blocks at random, fills the third group's
+// free low nibble, then randomizes the fourth group within 0x1000-0xffff
+// (staying clear of the bottom-of-block sliver that reads as the neighbouring
+// country) and the four host groups freely. Returns null for a country Fastly
+// has no exit in.
+function generateFastlyVpnIp(country) {
+  const groups = FASTLY_VPN_GROUPS[country];
+  if (!groups) return null;
+
+  const block = groups[Math.floor(Math.random() * groups.length)];
+  const g3 = block + Math.floor(Math.random() * 16).toString(16);
+  const g4 = (0x1000 + Math.floor(Math.random() * 0xf000)).toString(16);
+  const host = Array.from({ length: 4 }, () =>
+    Math.floor(Math.random() * 0x10000).toString(16).padStart(4, "0"),
+  );
+  return `2a00:8c40:${g3}:${g4}:${host.join(":")}`;
+}
+
+// Countries reachable through a Fastly MASQUE exit, in scan order.
+const FASTLY_VPN_COUNTRIES = Object.keys(FASTLY_VPN_GROUPS);
+
+// Human-readable shape of what generateFastlyVpnIp() emits for `country`,
+// shown in the dropdown in place of a fixed probe IP. Countries with several
+// /44 blocks get a bracketed alternation of the third group.
+function fastlyVpnIpPattern(country) {
+  const groups = FASTLY_VPN_GROUPS[country];
+  if (!groups) return null;
+  const block = groups.length === 1 ? groups[0] : `[${groups.join("|")}]`;
+  return `2a00:8c40:${block}[0-9a-f]:[1-f][0-9a-f]{3}:[0-9a-f]{4}(:[0-9a-f]{4}){3}`;
+}
+
+// Single source of truth for "which country maps to which spoofed IP", shared
+// by the Worker's scan and the browser page so the two can't drift. Countries
+// Fastly exits in get a fresh random MASQUE address per call; the United
+// States keeps Cloudflare WARP, whose addresses exhentai also reads as US and
+// which match the egress network a real WARP client browses from afterwards.
+// Everything else falls back to a random host inside its probe /24 or /64.
+function spoofIpForCountry(country) {
+  if (country === "United States") return generateUsWarpIp();
+  if (FASTLY_VPN_GROUPS[country]) return generateFastlyVpnIp(country);
+  return randomizeHostBits(COUNTRY_IPS[country]);
+}
+
 // English name -> Chinese name, sourced from exhentai's own
 // BROWSING_COUNTRY list so it matches uconfig.php's country strings.
 const COUNTRY_ZH = {
@@ -825,7 +925,13 @@ const COUNTRY_CODE = {
 export {
   randomizeHostBits,
   generateUsWarpIp,
+  generateFastlyVpnIp,
+  fastlyVpnIpPattern,
+  spoofIpForCountry,
+  FASTLY_VPN_GROUPS,
+  FASTLY_VPN_COUNTRIES,
   US_RANDOM_SENTINEL,
+  FASTLY_RANDOM_PREFIX,
   COUNTRY_ZH,
   COUNTRY_IPS,
   COUNTRY_CODE,

@@ -1,5 +1,5 @@
 import { openDirectHttpsSession } from "./lib/directTls.js";
-import { randomizeHostBits, generateUsWarpIp, COUNTRY_IPS } from "./country-ips.js";
+import { spoofIpForCountry, COUNTRY_IPS } from "./country-ips.js";
 
 // Only plain IPv4/IPv6 characters allowed, so a spoofed value can never break
 // out of the header line (no CR/LF, no ": " injection).
@@ -60,14 +60,6 @@ function jsonError(message, status, corsHeaders) {
 
 const IGNEOUS_RE = /igneous=([^;,]+)/;
 const SCAN_WAVE_SIZE = 25;
-
-// Picks the CF-Connecting-IP to spoof for one country. United States gets a
-// fresh random Cloudflare WARP IPv6 per request (mirrors the frontend), every
-// other country a random host inside its probe /24 or /64.
-function spoofIpForCountry(country) {
-  if (country === "United States") return generateUsWarpIp();
-  return randomizeHostBits(COUNTRY_IPS[country]);
-}
 
 export default {
   async fetch(request, env) {
