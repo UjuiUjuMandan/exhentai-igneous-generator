@@ -141,8 +141,9 @@ export default {
 
           // Default to the countries with a freshly generated VPN address (27:
           // WARP for the US, Fastly MASQUE for the rest). The rest of the table
-          // is one static probe IP per country, so scanning all 249 costs ~9x
-          // the requests to learn much less - opt in with all_countries.
+          // is one narrow probe network per country (usually a /24), so scanning
+          // all 249 costs ~9x the requests to learn much less - opt in with
+          // all_countries.
           const scanCountries = allCountries
             ? Object.keys(COUNTRY_IPS).sort()
             : RANDOM_IP_COUNTRIES;

@@ -224,8 +224,9 @@
     for (const country of Object.keys(COUNTRY_IPS).sort()) {
       const option = document.createElement("option");
       const label = (lang === "zh" && COUNTRY_ZH[country]) ? `${country} (${COUNTRY_ZH[country]})` : country;
-      // United States gets a fresh random Cloudflare WARP IPv6 per request
-      // instead of one fixed probe IP (see generateUsWarpIp in country-ips.js).
+      // United States gets a fresh random Cloudflare WARP IPv6 per request from
+      // a real egress range, not a random host in a narrow probe network like
+      // the other countries (see generateUsWarpIp in country-ips.js).
       if (country === "United States") {
         option.value = US_RANDOM_SENTINEL;
         option.textContent = `${label} (${US_RANDOM_IP_PATTERN})`;

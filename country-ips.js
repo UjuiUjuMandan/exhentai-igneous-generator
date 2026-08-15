@@ -155,10 +155,11 @@ function spoofIpForCountry(country) {
 }
 
 // True when `country` gets a freshly generated address per request (WARP for
-// the US, Fastly MASQUE for the rest) rather than a random host inside one
-// fixed probe CIDR. Those probe CIDRs are single addresses scraped from H@H
-// region probes -- they still work, but they're one static IP per country, so
-// a scan over them says much less than a scan over real VPN egress ranges.
+// the US, Fastly MASQUE for the rest) drawn from a real VPN egress range,
+// rather than a random host inside its probe CIDR. Those probe CIDRs are the
+// /24 (or /64) the H@H region probe was sourced from -- randomizing the host
+// bits still varies the address, but within one narrow network per country,
+// so a scan over them says much less than one over real VPN egress ranges.
 function hasRandomIp(country) {
   return country === "United States" || Boolean(FASTLY_VPN_GROUPS[country]);
 }
