@@ -1,5 +1,5 @@
 import { openDirectHttpsSession } from "./lib/directTls.js";
-import { spoofIpForCountry, COUNTRY_IPS } from "./country-ips.js";
+import { spoofIpForCountry, RANDOM_IP_COUNTRIES, COUNTRY_IPS } from "./country-ips.js";
 
 // Only plain IPv4/IPv6 characters allowed, so a spoofed value can never break
 // out of the header line (no CR/LF, no ": " injection).
@@ -82,12 +82,13 @@ export default {
         return jsonError("Only POST and OPTIONS methods are supported", 405, corsHeaders);
       }
 
-      let ipbMemberId, ipbPassHash, turnstileToken;
+      let ipbMemberId, ipbPassHash, turnstileToken, allCountries;
       try {
         const body = await request.json();
         ipbMemberId = body.ipb_member_id;
         ipbPassHash = body.ipb_pass_hash;
         turnstileToken = body.turnstile_token;
+        allCountries = body.all_countries === true;
       } catch {
         return jsonError("Invalid JSON body", 400, corsHeaders);
       }
@@ -138,9 +139,17 @@ export default {
         async start(controller) {
           const send = (obj) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
 
+          // Default to the countries with a freshly generated VPN address (27:
+          // WARP for the US, Fastly MASQUE for the rest). The rest of the table
+          // is one static probe IP per country, so scanning all 249 costs ~9x
+          // the requests to learn much less - opt in with all_countries.
+          const scanCountries = allCountries
+            ? Object.keys(COUNTRY_IPS).sort()
+            : RANDOM_IP_COUNTRIES;
+
           // Pre-flight ban/auth check against e-hentai.org's origin directly
           // (same authoritative signals /api's queryEhentai uses), so we never
-          // fire 249 requests at a logged-out or suspended account. This is a
+          // fire a whole scan at a logged-out or suspended account. This is a
           // separate connection from the exhentai scan below - different host,
           // and no CF-Connecting-IP spoofing is needed just to prove validity:
           //   - /uconfig.php 3xx -> /bounce_login.php  => definitively logged
@@ -152,7 +161,7 @@ export default {
           // account is healthy - the body could be a challenge page, an error,
           // or empty. So we require a POSITIVE signal before scanning, matching
           // /api's own "not suspended" bar: an actual browsing country parsed
-          // out of the response. Only then do we spend 249 requests.
+          // out of the response. Only then do we spend a scan's worth of requests.
           try {
             const ehentaiIp = EHENTAI_ORIGIN_IPS[Math.floor(Math.random() * EHENTAI_ORIGIN_IPS.length)];
             const checkSession = await openDirectHttpsSession({
@@ -198,7 +207,7 @@ export default {
               return;
             }
             // No positive browsing-country signal => could not confirm the
-            // account is healthy. Refuse to scan rather than waste 249 requests.
+            // account is healthy. Refuse to scan rather than waste a scan's worth of requests.
             if (!precheck.browsingCountry) {
               send({ type: "aborted", accountStatus: "unconfirmed" });
               controller.close();
@@ -209,7 +218,8 @@ export default {
               accountStatus: "not suspended",
               loginName: precheck.loginName,
               browsingCountry: precheck.browsingCountry,
-              total: Object.keys(COUNTRY_IPS).length,
+              total: scanCountries.length,
+              countries: scanCountries,
             });
           } catch (err) {
             send({ type: "error", message: "Pre-flight check failed: " + err.message });
@@ -303,7 +313,7 @@ export default {
           }
 
           try {
-            const countries = Object.keys(COUNTRY_IPS).sort();
+            const countries = scanCountries;
             // Fire in fixed-size waves so we stay under the server's
             // SETTINGS_MAX_CONCURRENT_STREAMS and don't hammer the origin all
             // at once. Results within a wave stream out as they resolve.

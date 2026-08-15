@@ -154,6 +154,15 @@ function spoofIpForCountry(country) {
   return randomizeHostBits(COUNTRY_IPS[country]);
 }
 
+// True when `country` gets a freshly generated address per request (WARP for
+// the US, Fastly MASQUE for the rest) rather than a random host inside one
+// fixed probe CIDR. Those probe CIDRs are single addresses scraped from H@H
+// region probes -- they still work, but they're one static IP per country, so
+// a scan over them says much less than a scan over real VPN egress ranges.
+function hasRandomIp(country) {
+  return country === "United States" || Boolean(FASTLY_VPN_GROUPS[country]);
+}
+
 // English name -> Chinese name, sourced from exhentai's own
 // BROWSING_COUNTRY list so it matches uconfig.php's country strings.
 const COUNTRY_ZH = {
@@ -920,6 +929,12 @@ const COUNTRY_CODE = {
   "Zimbabwe": "zw",
 };
 
+// The 27 countries reachable through a randomly generated address, which is
+// what the scanner covers unless asked for every country. Derived from
+// COUNTRY_IPS so a country can never be scanned without also having a probe
+// CIDR entry, and sorted so the Worker and the page agree on scan order.
+const RANDOM_IP_COUNTRIES = Object.keys(COUNTRY_IPS).filter(hasRandomIp).sort();
+
 // ES module: the Worker imports these for the server-side country scan
 // (_worker.js), and both browser pages import them from <script type="module">.
 export {
@@ -928,6 +943,8 @@ export {
   generateFastlyVpnIp,
   fastlyVpnIpPattern,
   spoofIpForCountry,
+  hasRandomIp,
+  RANDOM_IP_COUNTRIES,
   FASTLY_VPN_GROUPS,
   FASTLY_VPN_COUNTRIES,
   US_RANDOM_SENTINEL,

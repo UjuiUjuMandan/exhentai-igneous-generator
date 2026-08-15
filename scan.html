@@ -144,6 +144,11 @@
     <button type="button" id="stop-button" style="margin-bottom:0;display:none;background-color:#dc3545;">Stop</button>
   </div>
 
+  <label id="all-countries-label" style="display:block;margin-top:0.75rem;font-weight:normal;">
+    <input type="checkbox" id="all-countries" style="width:auto;margin-right:0.4rem;vertical-align:middle;">
+    <span id="all-countries-text">Scan all countries</span>
+  </label>
+
   <div id="error-message"></div>
   <div id="progress" hidden></div>
 
@@ -178,7 +183,9 @@
   </footer>
 
   <script type="module">
-    import { COUNTRY_ZH, COUNTRY_IPS, COUNTRY_CODE } from "/country-ips.js";
+    import { COUNTRY_ZH, COUNTRY_IPS, COUNTRY_CODE, RANDOM_IP_COUNTRIES } from "/country-ips.js";
+
+    const ALL_COUNTRIES = Object.keys(COUNTRY_IPS).sort();
 
     const MEMBER_ID_RE = /\d{1,20}/;
     const PASS_HASH_RE = /[a-f0-9]{16,128}/i;
@@ -189,10 +196,11 @@
       zh: {
         title: "ExHentai Igneous 国家扫描器",
         mainTitle: "ExHentai Igneous 国家扫描器",
-        intro: "遍历每个国家的 CF-Connecting-IP，列出各国返回的 igneous。",
+        intro: "遍历各国的 CF-Connecting-IP，列出各国返回的 igneous。默认只扫能随机生成 VPN 出口地址的 27 个国家。",
         pasteButton: "从剪贴板导入",
         scanButton: "开始扫描",
         stopButton: "停止",
+        allCountries: "扫描所有国家",
         thCountry: "国家",
         thIp: "CF-Connecting-IP",
         thBrowsing: "浏览国家",
@@ -207,10 +215,11 @@
       en: {
         title: "ExHentai Igneous Country Scanner",
         mainTitle: "ExHentai Igneous Country Scanner",
-        intro: "Scans every country's CF-Connecting-IP and reports the igneous each one returns.",
+        intro: "Scans each country's CF-Connecting-IP and reports the igneous it returns. Covers the 27 countries with a randomly generated VPN address unless told to scan all.",
         pasteButton: "Paste from Clipboard",
         scanButton: "Start Scan",
         stopButton: "Stop",
+        allCountries: "Scan all countries",
         thCountry: "Country",
         thIp: "CF-Connecting-IP",
         thBrowsing: "Browsing Country",
@@ -231,6 +240,7 @@
     document.getElementById("paste-button").textContent = t.pasteButton;
     document.getElementById("scan-button").textContent = t.scanButton;
     document.getElementById("stop-button").textContent = t.stopButton;
+    document.getElementById("all-countries-text").textContent = t.allCountries;
     document.getElementById("th-country").textContent = t.thCountry;
     document.getElementById("th-ip").textContent = t.thIp;
     document.getElementById("th-browsing").textContent = t.thBrowsing;
@@ -313,9 +323,11 @@
     }
 
     // At the start of a scan, grey out just the countries we're about to probe.
-    function resetMap() {
+    // Countries left out of this scan keep the map's own base colour, so an
+    // unchecked "all countries" run reads as "not scanned" rather than failed.
+    function resetMap(countries) {
       if (!mapSvg) return;
-      for (const country of Object.keys(COUNTRY_IPS)) colorCountry(country, "pending");
+      for (const country of countries) colorCountry(country, "pending");
     }
 
     function showError(msg) {
@@ -390,13 +402,13 @@
       }
     }
 
-    // Builds the full pending table up front (one row per country) so the
-    // streamed results just fill cells in as they arrive.
-    function buildRows() {
+    // Builds the full pending table up front (one row per country in
+    // `countries`) so the streamed results just fill cells in as they arrive.
+    function buildRows(countries) {
       rows.length = 0;
       byCountry.clear();
       bodyEl.innerHTML = "";
-      for (const country of Object.keys(COUNTRY_IPS).sort()) {
+      for (const country of countries) {
         const tr = document.createElement("tr");
         tr.className = "pending";
         const rec = { country, ip: "", browsingCountry: "", igneous: "", state: "pending", tr };
@@ -431,14 +443,19 @@
       const turnstileToken = window.turnstile ? window.turnstile.getResponse() : "";
       if (!turnstileToken) return showError("Please complete the Turnstile challenge first.");
 
+      const allCountriesBox = document.getElementById("all-countries");
+      const allCountries = allCountriesBox.checked;
+
       scanning = true;
       scanButton.disabled = true;
+      allCountriesBox.disabled = true;
       stopButton.style.display = "block";
       progressEl.hidden = false;
       progressEl.textContent = "Checking account status...";
       abortController = new AbortController();
 
-      let total = Object.keys(COUNTRY_IPS).length;
+      let scanCountries = allCountries ? ALL_COUNTRIES : RANDOM_IP_COUNTRIES;
+      let total = scanCountries.length;
       let done = 0;
       let hits = 0;
 
@@ -449,7 +466,7 @@
         const res = await fetch("/api/scan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ipb_member_id: memberId, ipb_pass_hash: passHash, turnstile_token: turnstileToken }),
+          body: JSON.stringify({ ipb_member_id: memberId, ipb_pass_hash: passHash, turnstile_token: turnstileToken, all_countries: allCountries }),
           signal: abortController.signal,
         });
         if (!res.ok) {
@@ -489,11 +506,14 @@
               showError("Server error: " + msg.message);
               return;
             } else if (msg.type === "ready") {
-              total = msg.total ?? total;
-              buildRows();
+              // The Worker decides the country list; trust its copy over ours
+              // so the table can't end up with rows nothing will ever fill.
+              if (Array.isArray(msg.countries) && msg.countries.length) scanCountries = msg.countries;
+              total = msg.total ?? scanCountries.length;
+              buildRows(scanCountries);
               try {
                 await loadMap();
-                resetMap();
+                resetMap(scanCountries);
                 mapWrap.hidden = false;
               } catch (e) {
                 // Map is a nice-to-have; the table still works without it.
@@ -522,6 +542,7 @@
       } finally {
         scanning = false;
         scanButton.disabled = false;
+        allCountriesBox.disabled = false;
         stopButton.style.display = "none";
         abortController = null;
         // The token is single-use - reset the widget so the next scan gets a
