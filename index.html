@@ -144,6 +144,8 @@
     const PASS_HASH_RE = /[a-f0-9]{16,128}/i;
     const IP_RE = /^[0-9a-fA-F:.]+$/;
 
+    let activeButton = null;
+
     const translations = {
       "zh": {
         title: "ExHentai Igneous 生成器",
@@ -272,6 +274,7 @@
     updateCountrySelectAvailability();
 
     document.getElementById("submit-button").addEventListener("click", async () => {
+      activeButton = document.getElementById("submit-button");
       const memberIdField = document.getElementById("ipb_member_id");
       const passHashField = document.getElementById("ipb_pass_hash");
       const memberIdMatch = memberIdField.value.match(MEMBER_ID_RE);
@@ -364,22 +367,24 @@
         document.getElementById("copy-output").hidden = false;
         document.getElementById("copy-button").hidden = false;
         document.querySelector("#result > h3").hidden = false;
-
-        document.getElementById("copy-button").addEventListener("click", () => {
-          navigator.clipboard.writeText(codeOutput)
-            .then(() => {
-              showStatus("Code copied to clipboard!");
-            })
-            .catch(err => {
-              showError("Failed to copy: " + err.message);
-            });
-        });
       } catch (err) {
         showError("Error: " + err.message);
       }
     });
 
+    document.getElementById("copy-button").addEventListener("click", () => {
+      activeButton = document.getElementById("copy-button");
+      navigator.clipboard.writeText(document.getElementById("copy-output").textContent)
+        .then(() => {
+          showStatus("Code copied to clipboard!");
+        })
+        .catch(err => {
+          showError("Failed to copy: " + err.message);
+        });
+    });
+
     document.getElementById("paste-button").addEventListener("click", async () => {
+      activeButton = document.getElementById("paste-button");
       try {
         const clipboardText = await navigator.clipboard.readText();
         const data = parseClipboardData(clipboardText);
@@ -410,20 +415,28 @@
       return null;
     }
 
+    function showBanner(id, message) {
+      const banner = document.getElementById(id);
+      banner.textContent = message;
+
+      if (activeButton) {
+        const other = document.getElementById(
+          id === "status-message" ? "error-message" : "status-message");
+        other.style.display = "none";
+        activeButton.after(banner, other);
+      }
+
+      banner.style.display = "block";
+      banner.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      setTimeout(() => banner.style.display = "none", 3000);  // Hide after 3 seconds
+    }
+
     function showStatus(message) {
-      const statusMessage = document.getElementById("status-message");
-      statusMessage.textContent = message;
-      statusMessage.style.display = "block";
-      statusMessage.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      setTimeout(() => statusMessage.style.display = "none", 3000);  // Hide after 3 seconds
+      showBanner("status-message", message);
     }
 
     function showError(message) {
-      const errorMessage = document.getElementById("error-message");
-      errorMessage.textContent = message;
-      errorMessage.style.display = "block";
-      errorMessage.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      setTimeout(() => errorMessage.style.display = "none", 3000);  // Hide after 3 seconds
+      showBanner("error-message", message);
     }
   </script>
 
