@@ -260,7 +260,7 @@ export default {
               sniHost: "e-hentai.org",
             });
           } catch {
-            // Non-fatal: the scan still works, mystery rows just keep Unknown.
+            // Non-fatal: the scan still works, mystery rows just keep a null country.
             ehentaiSession = null;
           }
 
@@ -306,7 +306,7 @@ export default {
                 spoofedIp,
                 status: "ok",
                 igneous,
-                browsingCountry: browsingCountry || "Unknown",
+                browsingCountry: browsingCountry ?? null,
               };
             } catch (err) {
               return { type: "result", country, spoofedIp, status: "error", message: err.message };
@@ -463,13 +463,13 @@ export default {
             const uconfigResponse = await session.request({ path: "/uconfig.php", headers: directHeaders });
             const rateLimitMatch = uconfigResponse.body.match(RATE_LIMIT_RE);
             if (rateLimitMatch) {
-              return { headersObject: uconfigResponse.headers, browsingCountry: "Unknown", rateLimitExpiresIn: rateLimitMatch[1] };
+              return { headersObject: uconfigResponse.headers, browsingCountry: null, rateLimitExpiresIn: rateLimitMatch[1] };
             }
             if (ACCOUNT_SUSPENDED_RE.test(uconfigResponse.body)) {
-              return { headersObject: uconfigResponse.headers, browsingCountry: "Unknown", accountSuspended: true };
+              return { headersObject: uconfigResponse.headers, browsingCountry: null, accountSuspended: true };
             }
             const match = uconfigResponse.body.match(EXHENTAI_BROWSING_COUNTRY_RE);
-            return { headersObject: uconfigResponse.headers, browsingCountry: match ? match[1] : "Unknown" };
+            return { headersObject: uconfigResponse.headers, browsingCountry: match ? match[1] : null };
           } finally {
             await session.close();
           }
@@ -496,7 +496,7 @@ export default {
               return { accountSuspended: true };
             }
             const ehentaiMatch = ehentaiResponse.body.match(EHENTAI_BROWSING_COUNTRY_RE);
-            return { browsingCountry: ehentaiMatch ? ehentaiMatch[1] : undefined };
+            return { browsingCountry: ehentaiMatch ? ehentaiMatch[1] : null };
           } finally {
             await ehentaiSession.close();
           }
@@ -507,24 +507,26 @@ export default {
         const headersObject = exhentaiResult.headersObject;
         const unauthenticatedConfirmed = ehentaiResult.unauthenticatedConfirmed;
         const accountSuspended = exhentaiResult.accountSuspended || ehentaiResult.accountSuspended;
-        const browsingCountry = exhentaiResult.browsingCountry !== "Unknown" ? exhentaiResult.browsingCountry : (ehentaiResult.browsingCountry ?? "Unknown");
+        const browsingCountry = exhentaiResult.browsingCountry ?? ehentaiResult.browsingCountry ?? null;
         const rateLimitExpiresIn = exhentaiResult.rateLimitExpiresIn || ehentaiResult.rateLimitExpiresIn;
+
+        const accountStatus = unauthenticatedConfirmed
+          ? "unauthenticated"
+          : accountSuspended
+          ? "suspended"
+          : loggedInMatch || browsingCountry !== null
+          ? "not suspended"
+          : "Unknown";
 
         return new Response(
           JSON.stringify(
             {
-              accountStatus: unauthenticatedConfirmed
-                ? "unauthenticated"
-                : accountSuspended
-                ? "suspended"
-                : loggedInMatch || browsingCountry !== "Unknown"
-                ? "not suspended"
-                : "Unknown",
+              accountStatus: accountStatus,
               loginName: loginName,
               ipStatus: rateLimitExpiresIn ? "rateLimited" : "OK",
               ...(rateLimitExpiresIn ? { rateLimitExpiresIn } : {}),
               headers: headersObject,
-              browsingCountry: browsingCountry,
+              ...(accountStatus === "not suspended" ? { browsingCountry: browsingCountry } : {}),
             },
             null,
             2
