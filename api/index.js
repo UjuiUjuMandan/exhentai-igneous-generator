@@ -90,13 +90,13 @@ export async function index(context, req) {
 
       const rateLimitMatch = body.match(RATE_LIMIT_RE);
       if (rateLimitMatch) {
-        return { headersObject, browsingCountry: "Unknown", rateLimitExpiresIn: rateLimitMatch[1] };
+        return { headersObject, browsingCountry: null, rateLimitExpiresIn: rateLimitMatch[1] };
       }
       if (ACCOUNT_SUSPENDED_RE.test(body)) {
-        return { headersObject, browsingCountry: "Unknown", accountSuspended: true };
+        return { headersObject, browsingCountry: null, accountSuspended: true };
       }
       const match = body.match(EXHENTAI_BROWSING_COUNTRY_RE);
-      return { headersObject, browsingCountry: match ? match[1] : "Unknown" };
+      return { headersObject, browsingCountry: match ? match[1] : null };
     }
 
     async function queryEhentai() {
@@ -114,7 +114,7 @@ export async function index(context, req) {
         return { accountSuspended: true };
       }
       const match = body.match(EHENTAI_BROWSING_COUNTRY_RE);
-      return { browsingCountry: match ? match[1] : undefined };
+      return { browsingCountry: match ? match[1] : null };
     }
 
     const [exhentaiResult, ehentaiResult] = await Promise.all([queryExhentai(), queryEhentai()]);
@@ -125,22 +125,24 @@ export async function index(context, req) {
     // exhentai's browsing-country string only appears once the spoofed IP
     // has also passed exhentai's IP-auth check; if it hasn't, use
     // e-hentai's country instead (it only checks account credentials).
-    const browsingCountry = exhentaiResult.browsingCountry !== "Unknown" ? exhentaiResult.browsingCountry : (ehentaiResult.browsingCountry ?? "Unknown");
+    const browsingCountry = exhentaiResult.browsingCountry ?? ehentaiResult.browsingCountry ?? null;
     const rateLimitExpiresIn = exhentaiResult.rateLimitExpiresIn || ehentaiResult.rateLimitExpiresIn;
 
+    const accountStatus = unauthenticatedConfirmed
+      ? "unauthenticated"
+      : accountSuspended
+      ? "suspended"
+      : loggedInMatch || browsingCountry !== null
+      ? "not suspended"
+      : "Unknown";
+
     context.res.body = {
-      accountStatus: unauthenticatedConfirmed
-        ? "unauthenticated"
-        : accountSuspended
-        ? "suspended"
-        : loggedInMatch || browsingCountry !== "Unknown"
-        ? "not suspended"
-        : "Unknown",
+      accountStatus: accountStatus,
       loginName: loginName,
       ipStatus: rateLimitExpiresIn ? "rateLimited" : "OK",
       ...(rateLimitExpiresIn ? { rateLimitExpiresIn } : {}),
       headers: headersObject,
-      browsingCountry: browsingCountry,
+      ...(accountStatus === "not suspended" ? { browsingCountry: browsingCountry } : {}),
     };
   } catch (error) {
     context.log.error(error);
