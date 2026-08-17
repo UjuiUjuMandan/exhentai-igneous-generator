@@ -1,444 +1,527 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-commit-sha="">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta property="og:title" content="ExHentai Igneous Generator">
-  <meta property="og:description" content="Get ExHentai igneous via PaaS proxy">
-  <meta property="og:url" content="https://exhentai-igneous-generator.pages.dev">
-  <meta property="og:type" content="website">
-  <meta property="og:image" content="https://exhentai-igneous-generator.pages.dev/Tenboro.png">
-  <meta property="og:site_name" content="ExHentai Igneous Generator">
-  <meta property="og:locale" content="en_US">
-  <title id="title">ExHentai Igneous Generator</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 2em;
-      line-height: 1.6;
-    }
-    label {
-      display: block;
-      margin-bottom: 0.5em;
-      font-weight: bold;
-    }
-    input, button, select {
-      padding: 0.5em;
-      margin-bottom: 1em;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    button {
-      background-color: #007BFF;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    #result {
-      margin-top: 2em;
-      padding: 1em;
-      border: 1px solid #ccc;
-      background-color: #f9f9f9;
-    }
-    footer {
-      margin-top: 2em;
-      text-align: center;
-      color: #666;
-    }
-    footer a {
-      color: #666;
-      text-decoration: underline;
-    }
-    footer a:hover {
-      color: #007BFF;
-    }
-    pre {
-      background-color: #f4f4f4;
-      padding: 1em;
-      border: 1px solid #ccc;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-    #copy-button {
-      margin-top: 1em;
-      background-color: #28a745;
-    }
-    #status-message {
-      margin-top: 1em;
-      padding: 1em;
-      border: 1px solid #ccc;
-      background-color: #d4edda;
-      color: #155724;
-      display: none;
-    }
-    #error-message {
-      margin-top: 1em;
-      padding: 1em;
-      border: 1px solid #ccc;
-      background-color: #f8d7da;
-      color: #721c24;
-      display: none;
-    }
-    #main-image {
-      max-width: 100%;
-      height: auto;
-      display: block;
-      margin: 0 auto 2em;
-    }
-  </style>
-</head>
-<body>
-  <h1 id="main-title">ExHentai Igneous Generator</h1>
-  
-  <!-- Main Image -->
-  <img id="main-image" src="/Tenboro.png" alt="Tenboro Image">
-
-  <form id="endpoint-form">
-    <select id="api-endpoint">
-      <option value="/api">Default - Cloudflare Workers</option>
-      <option data-cloud-run-api hidden>Default - Google Cloud Run</option>
-      <option data-aws-lambda-api hidden>Default - AWS Lambda</option>
-      <option data-azure-func-api hidden>Default - Microsoft Azure Functions</option>
-      <option value="custom">Custom</option>
-    </select>
-    <input type="text" id="custom-endpoint" placeholder="Enter custom API endpoint" style="display: none;">
-
-    <label id="country-label" for="country-select">CF-Connecting-IP</label>
-    <select id="country-select">
-      <option value="" id="country-default-option">None</option>
-    </select>
-    <input type="text" id="custom-country-ip" placeholder="Enter IP address" style="display: none;">
-  </form>
-
-  <form id="ipb-cookie-form">
-    <input type="text" id="ipb_member_id" name="ipb_member_id" placeholder="ipb_member_id" required>
-    <input type="text" id="ipb_pass_hash" name="ipb_pass_hash" placeholder="ipb_pass_hash" required>
-    
-    <button type="button" id="submit-button">GET</button>
-  </form>
-  
-  <button type="button" id="paste-button">Paste from Clipboard</button>
-
-  <div id="status-message">Code copied to clipboard!</div>
-  <div id="error-message">Failed to copy: Something went wrong!</div>
-
-  <div id="result" hidden>
-    <h2 id="response-title">Response:</h2>
-    <pre id="response-output"></pre>
-    <h3 id="cookie-title">Cookie for EhViewer:</h3>
-    <pre id="copy-output"></pre>
-    <button id="copy-button" hidden>Copy to Clipboard</button>
-  </div>
-
-  <footer>
-    <p><a id="scan-link" href="/scan.html">Country Scanner</a> | <a id="source-code-link" href="https://github.com/UjuiUjuMandan/exhentai-igneous-generator" target="_blank">GitHub</a> | <a id="privacy-policy" href="/privacy_policy.txt" target="_blank">Privacy Policy</a></p>
-  </footer>
-
-  <script type="module">
-    import { randomizeHostBits, generateUsWarpIp, generateFastlyVpnIp, fastlyVpnIpPattern, US_RANDOM_SENTINEL, FASTLY_RANDOM_PREFIX, FASTLY_VPN_GROUPS, COUNTRY_ZH, COUNTRY_IPS } from "/country-ips.js";
-
-    const MEMBER_ID_RE = /\d{1,20}/;
-    const PASS_HASH_RE = /[a-f0-9]{16,128}/i;
-    const IP_RE = /^[0-9a-fA-F:.]+$/;
-
-    let activeButton = null;
-
-    const translations = {
-      "zh": {
-        title: "ExHentai Igneous 生成器",
-        mainTitle: "ExHentai Igneous 生成器",
-        pasteButton: "从剪贴板导入",
-        submitButton: "获取",
-        responseTitle: "响应：",
-        cookieTitle: "Cookie 为 EhViewer：",
-        copyButton: "复制到剪贴板",
-        statusMessage: "代码已复制到剪贴板！",
-        errorMessage: "复制失败：发生错误！",
-        privacyPolicy: "隐私政策",
-        countryLabel: "CF-Connecting-IP",
-        countryDefault: "无",
-        scanLink: "国家扫描器"
-      },
-      "en": {
-        title: "ExHentai Igneous Generator",
-        mainTitle: "ExHentai Igneous Generator",
-        pasteButton: "Paste from Clipboard",
-        submitButton: "GET",
-        responseTitle: "Response:",
-        cookieTitle: "Cookie for EhViewer:",
-        copyButton: "Copy to Clipboard",
-        statusMessage: "Code copied to clipboard!",
-        errorMessage: "Failed to copy: Something went wrong!",
-        privacyPolicy: "Privacy Policy",
-        countryLabel: "CF-Connecting-IP",
-        countryDefault: "None",
-        scanLink: "Country Scanner"
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta property="og:title" content="ExHentai Igneous Generator" />
+    <meta
+      property="og:description"
+      content="Get ExHentai igneous via PaaS proxy"
+    />
+    <meta
+      property="og:url"
+      content="https://exhentai-igneous-generator.pages.dev"
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:image"
+      content="https://exhentai-igneous-generator.pages.dev/Tenboro.png"
+    />
+    <meta property="og:site_name" content="ExHentai Igneous Generator" />
+    <meta property="og:locale" content="en_US" />
+    <title id="title">ExHentai Igneous Generator</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 2em;
+        line-height: 1.6;
       }
-    };
-
-    const lang = navigator.language.startsWith("zh") ? "zh" : "en";
-
-    const applyTranslations = () => {
-      document.getElementById("title").textContent = translations[lang].title;
-      document.getElementById("main-title").textContent = translations[lang].mainTitle;
-      document.getElementById("paste-button").textContent = translations[lang].pasteButton;
-      document.getElementById("submit-button").textContent = translations[lang].submitButton;
-      document.getElementById("response-title").textContent = translations[lang].responseTitle;
-      document.getElementById("cookie-title").textContent = translations[lang].cookieTitle;
-      document.getElementById("copy-button").textContent = translations[lang].copyButton;
-      document.getElementById("status-message").textContent = translations[lang].statusMessage;
-      document.getElementById("error-message").textContent = translations[lang].errorMessage;
-      document.getElementById("privacy-policy").textContent = translations[lang].privacyPolicy;
-      const commitSha = document.documentElement.dataset.commitSha;
-      const sourceLink = document.getElementById("source-code-link");
-      if (commitSha) {
-        sourceLink.href = `https://github.com/UjuiUjuMandan/exhentai-igneous-generator/tree/${commitSha}`;
-        sourceLink.textContent = commitSha.slice(0, 7);
+      label {
+        display: block;
+        margin-bottom: 0.5em;
+        font-weight: bold;
       }
-      document.getElementById("country-label").textContent = translations[lang].countryLabel;
-      document.getElementById("country-default-option").textContent = translations[lang].countryDefault;
-      document.getElementById("scan-link").textContent = translations[lang].scanLink;
-    };
-
-    applyTranslations();
-
-    const endpointSelect = document.getElementById("api-endpoint");
-    const customEndpointInput = document.getElementById("custom-endpoint");
-    const countrySelect = document.getElementById("country-select");
-    const customCountryIpInput = document.getElementById("custom-country-ip");
-
-    // Shown next to United States instead of the literal word "random": the
-    // exact shape generateUsWarpIp() (below) produces on every request.
-    const US_RANDOM_IP_PATTERN = "2a09:bac1:76[8ace]0:[0-9][0-9a-f]{3}:0000:0000:0[0-9a-f]{3}:0[0-9a-f]{3}";
-
-    const customCountryOption = document.createElement("option");
-    customCountryOption.value = "custom";
-    customCountryOption.textContent = "Custom";
-    countrySelect.appendChild(customCountryOption);
-
-    // Country spoofing (CF-Connecting-IP) only works through this project's
-    // own Cloudflare Workers /api endpoint, which is the only one that speaks
-    // TLS directly to exhentai.org itself. Cloud Run / AWS Lambda / Azure
-    // Functions still just do a plain fetch(), so the picker is hidden there.
-    for (const country of Object.keys(COUNTRY_IPS).sort()) {
-      const option = document.createElement("option");
-      const label = (lang === "zh" && COUNTRY_ZH[country]) ? `${country} (${COUNTRY_ZH[country]})` : country;
-      // United States gets a fresh random Cloudflare WARP IPv6 per request from
-      // a real egress range, not a random host in a narrow probe network like
-      // the other countries (see generateUsWarpIp in country-ips.js).
-      if (country === "United States") {
-        option.value = US_RANDOM_SENTINEL;
-        option.textContent = `${label} (${US_RANDOM_IP_PATTERN})`;
-      } else if (FASTLY_VPN_GROUPS[country]) {
-        // Countries with a Fastly MASQUE exit likewise get a fresh random
-        // address per request, out of that country's own /44 blocks.
-        option.value = `${FASTLY_RANDOM_PREFIX}${country}`;
-        option.textContent = `${label} (${fastlyVpnIpPattern(country)})`;
-      } else {
-        option.value = COUNTRY_IPS[country];
-        option.textContent = `${label} (${COUNTRY_IPS[country]})`;
+      input,
+      button,
+      select {
+        padding: 0.5em;
+        margin-bottom: 1em;
+        width: 100%;
+        box-sizing: border-box;
       }
-      countrySelect.appendChild(option);
-    }
-
-    countrySelect.value = US_RANDOM_SENTINEL;
-
-    const countryLabel = document.getElementById("country-label");
-
-    countrySelect.addEventListener("change", () => {
-      customCountryIpInput.style.display = countrySelect.value === "custom" ? "block" : "none";
-    });
-
-    const updateCountrySelectAvailability = () => {
-      const isDefaultWorkersEndpoint = endpointSelect.value === "/api";
-      countrySelect.disabled = !isDefaultWorkersEndpoint;
-      countryLabel.style.display = isDefaultWorkersEndpoint ? "block" : "none";
-      countrySelect.style.display = isDefaultWorkersEndpoint ? "block" : "none";
-      // Just hide it - don't reset countrySelect.value here, or switching away
-      // and back to the Workers endpoint loses whatever was picked before.
-      customCountryIpInput.style.display = (isDefaultWorkersEndpoint && countrySelect.value === "custom") ? "block" : "none";
-    };
-
-    endpointSelect.addEventListener("change", () => {
-      if (endpointSelect.value === "custom") {
-        customEndpointInput.style.display = "block";
-      } else {
-        customEndpointInput.style.display = "none";
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
       }
-      updateCountrySelectAvailability();
-    });
-
-    updateCountrySelectAvailability();
-
-    document.getElementById("submit-button").addEventListener("click", async () => {
-      activeButton = document.getElementById("submit-button");
-      const memberIdField = document.getElementById("ipb_member_id");
-      const passHashField = document.getElementById("ipb_pass_hash");
-      const memberIdMatch = memberIdField.value.match(MEMBER_ID_RE);
-      const passHashMatch = passHashField.value.match(PASS_HASH_RE);
-
-      if (!memberIdField.value || !passHashField.value) {
-        showError("Please fill in both fields.");
-        return;
+      button:hover {
+        background-color: #0056b3;
       }
-
-      if (!memberIdMatch) {
-        showError("IPB Member ID must be a number.");
-        return;
+      #result {
+        margin-top: 2em;
+        padding: 1em;
+        border: 1px solid #ccc;
+        background-color: #f9f9f9;
       }
-
-      if (!passHashMatch) {
-        showError("IPB Pass Hash must be a hex string.");
-        return;
+      footer {
+        margin-top: 2em;
+        text-align: center;
+        color: #666;
       }
+      footer a {
+        color: #666;
+        text-decoration: underline;
+      }
+      footer a:hover {
+        color: #007bff;
+      }
+      pre {
+        background-color: #f4f4f4;
+        padding: 1em;
+        border: 1px solid #ccc;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      #copy-button {
+        margin-top: 1em;
+        background-color: #28a745;
+      }
+      #status-message {
+        margin-top: 1em;
+        padding: 1em;
+        border: 1px solid #ccc;
+        background-color: #d4edda;
+        color: #155724;
+        display: none;
+      }
+      #error-message {
+        margin-top: 1em;
+        padding: 1em;
+        border: 1px solid #ccc;
+        background-color: #f8d7da;
+        color: #721c24;
+        display: none;
+      }
+      #main-image {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 0 auto 2em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="main-title">ExHentai Igneous Generator</h1>
 
-      const memberId = memberIdField.value = memberIdMatch[0];
-      const passHash = passHashField.value = passHashMatch[0];
+    <img id="main-image" src="/Tenboro.png" alt="Tenboro Image" />
 
-      let url = endpointSelect.value;
-      if (url === "custom") {
-        url = customEndpointInput.value;
-        if (!url) {
-          showError("Please enter a valid API endpoint.");
-          return;
+    <form id="endpoint-form">
+      <select id="api-endpoint">
+        <option value="/api">Default - Cloudflare Workers</option>
+        <option data-cloud-run-api hidden>Default - Google Cloud Run</option>
+        <option data-aws-lambda-api hidden>Default - AWS Lambda</option>
+        <option data-azure-func-api hidden>
+          Default - Microsoft Azure Functions
+        </option>
+        <option value="custom">Custom</option>
+      </select>
+      <input
+        type="text"
+        id="custom-endpoint"
+        placeholder="Enter custom API endpoint"
+        style="display: none"
+      />
+
+      <label id="country-label" for="country-select">CF-Connecting-IP</label>
+      <select id="country-select">
+        <option value="" id="country-default-option">None</option>
+      </select>
+      <input
+        type="text"
+        id="custom-country-ip"
+        placeholder="Enter IP address"
+        style="display: none"
+      />
+    </form>
+
+    <form id="ipb-cookie-form">
+      <input
+        type="text"
+        id="ipb_member_id"
+        name="ipb_member_id"
+        placeholder="ipb_member_id"
+        required
+      />
+      <input
+        type="text"
+        id="ipb_pass_hash"
+        name="ipb_pass_hash"
+        placeholder="ipb_pass_hash"
+        required
+      />
+
+      <button type="button" id="submit-button">GET</button>
+    </form>
+
+    <button type="button" id="paste-button">Paste from Clipboard</button>
+
+    <div id="status-message">Code copied to clipboard!</div>
+    <div id="error-message">Failed to copy: Something went wrong!</div>
+
+    <div id="result" hidden>
+      <h2 id="response-title">Response:</h2>
+      <pre id="response-output"></pre>
+      <h3 id="cookie-title">Cookie for EhViewer:</h3>
+      <pre id="copy-output"></pre>
+      <button id="copy-button" hidden>Copy to Clipboard</button>
+    </div>
+
+    <footer>
+      <p>
+        <a id="scan-link" href="/scan.html">Country Scanner</a> |
+        <a
+          id="source-code-link"
+          href="https://github.com/UjuiUjuMandan/exhentai-igneous-generator"
+          target="_blank"
+          >GitHub</a
+        >
+        |
+        <a id="privacy-policy" href="/privacy_policy.txt" target="_blank"
+          >Privacy Policy</a
+        >
+      </p>
+    </footer>
+
+    <script type="module">
+      import {
+        randomizeHostBits,
+        generateUsWarpIp,
+        generateFastlyVpnIp,
+        fastlyVpnIpPattern,
+        US_RANDOM_SENTINEL,
+        FASTLY_RANDOM_PREFIX,
+        FASTLY_VPN_GROUPS,
+        COUNTRY_ZH,
+        COUNTRY_IPS,
+      } from '/country-ips.js';
+
+      const MEMBER_ID_RE = /\d{1,20}/;
+      const PASS_HASH_RE = /[a-f0-9]{16,128}/i;
+      const IP_RE = /^[0-9a-fA-F:.]+$/;
+
+      let activeButton = null;
+
+      const translations = {
+        zh: {
+          title: 'ExHentai Igneous 生成器',
+          mainTitle: 'ExHentai Igneous 生成器',
+          pasteButton: '从剪贴板导入',
+          submitButton: '获取',
+          responseTitle: '响应：',
+          cookieTitle: 'Cookie 为 EhViewer：',
+          copyButton: '复制到剪贴板',
+          statusMessage: '代码已复制到剪贴板！',
+          errorMessage: '复制失败：发生错误！',
+          privacyPolicy: '隐私政策',
+          countryLabel: 'CF-Connecting-IP',
+          countryDefault: '无',
+          scanLink: '国家扫描器',
+        },
+        en: {
+          title: 'ExHentai Igneous Generator',
+          mainTitle: 'ExHentai Igneous Generator',
+          pasteButton: 'Paste from Clipboard',
+          submitButton: 'GET',
+          responseTitle: 'Response:',
+          cookieTitle: 'Cookie for EhViewer:',
+          copyButton: 'Copy to Clipboard',
+          statusMessage: 'Code copied to clipboard!',
+          errorMessage: 'Failed to copy: Something went wrong!',
+          privacyPolicy: 'Privacy Policy',
+          countryLabel: 'CF-Connecting-IP',
+          countryDefault: 'None',
+          scanLink: 'Country Scanner',
+        },
+      };
+
+      const lang = navigator.language.startsWith('zh') ? 'zh' : 'en';
+
+      const applyTranslations = () => {
+        document.getElementById('title').textContent = translations[lang].title;
+        document.getElementById('main-title').textContent =
+          translations[lang].mainTitle;
+        document.getElementById('paste-button').textContent =
+          translations[lang].pasteButton;
+        document.getElementById('submit-button').textContent =
+          translations[lang].submitButton;
+        document.getElementById('response-title').textContent =
+          translations[lang].responseTitle;
+        document.getElementById('cookie-title').textContent =
+          translations[lang].cookieTitle;
+        document.getElementById('copy-button').textContent =
+          translations[lang].copyButton;
+        document.getElementById('status-message').textContent =
+          translations[lang].statusMessage;
+        document.getElementById('error-message').textContent =
+          translations[lang].errorMessage;
+        document.getElementById('privacy-policy').textContent =
+          translations[lang].privacyPolicy;
+        const commitSha = document.documentElement.dataset.commitSha;
+        const sourceLink = document.getElementById('source-code-link');
+        if (commitSha) {
+          sourceLink.href = `https://github.com/UjuiUjuMandan/exhentai-igneous-generator/tree/${commitSha}`;
+          sourceLink.textContent = commitSha.slice(0, 7);
         }
+        document.getElementById('country-label').textContent =
+          translations[lang].countryLabel;
+        document.getElementById('country-default-option').textContent =
+          translations[lang].countryDefault;
+        document.getElementById('scan-link').textContent =
+          translations[lang].scanLink;
+      };
+
+      applyTranslations();
+
+      const endpointSelect = document.getElementById('api-endpoint');
+      const customEndpointInput = document.getElementById('custom-endpoint');
+      const countrySelect = document.getElementById('country-select');
+      const customCountryIpInput = document.getElementById('custom-country-ip');
+
+      const US_RANDOM_IP_PATTERN =
+        '2a09:bac1:76[8ace]0:[0-9][0-9a-f]{3}:0000:0000:0[0-9a-f]{3}:0[0-9a-f]{3}';
+
+      const customCountryOption = document.createElement('option');
+      customCountryOption.value = 'custom';
+      customCountryOption.textContent = 'Custom';
+      countrySelect.appendChild(customCountryOption);
+
+      // Country spoofing (CF-Connecting-IP) only works through this project's
+      // own Cloudflare Workers /api endpoint, which is the only one that speaks
+      // TLS directly to exhentai.org itself. Cloud Run / AWS Lambda / Azure
+      // Functions still just do a plain fetch(), so the picker is hidden there.
+      for (const country of Object.keys(COUNTRY_IPS).sort()) {
+        const option = document.createElement('option');
+        const label =
+          lang === 'zh' && COUNTRY_ZH[country]
+            ? `${country} (${COUNTRY_ZH[country]})`
+            : country;
+        if (country === 'United States') {
+          option.value = US_RANDOM_SENTINEL;
+          option.textContent = `${label} (${US_RANDOM_IP_PATTERN})`;
+        } else if (FASTLY_VPN_GROUPS[country]) {
+          option.value = `${FASTLY_RANDOM_PREFIX}${country}`;
+          option.textContent = `${label} (${fastlyVpnIpPattern(country)})`;
+        } else {
+          option.value = COUNTRY_IPS[country];
+          option.textContent = `${label} (${COUNTRY_IPS[country]})`;
+        }
+        countrySelect.appendChild(option);
       }
 
-      const requestBody = { ipb_member_id: memberId, ipb_pass_hash: passHash };
-      if (!countrySelect.disabled && countrySelect.value) {
-        let spoofedIp;
-        if (countrySelect.value === US_RANDOM_SENTINEL) {
-          spoofedIp = generateUsWarpIp();
-        } else if (countrySelect.value.startsWith(FASTLY_RANDOM_PREFIX)) {
-          spoofedIp = generateFastlyVpnIp(countrySelect.value.slice(FASTLY_RANDOM_PREFIX.length));
-        } else if (countrySelect.value === "custom") {
-          spoofedIp = customCountryIpInput.value.trim();
-          if (!IP_RE.test(spoofedIp)) {
-            showError("Please enter a valid CF-Connecting-IP value.");
+      countrySelect.value = US_RANDOM_SENTINEL;
+
+      const countryLabel = document.getElementById('country-label');
+
+      countrySelect.addEventListener('change', () => {
+        customCountryIpInput.style.display =
+          countrySelect.value === 'custom' ? 'block' : 'none';
+      });
+
+      const updateCountrySelectAvailability = () => {
+        const isDefaultWorkersEndpoint = endpointSelect.value === '/api';
+        countrySelect.disabled = !isDefaultWorkersEndpoint;
+        countryLabel.style.display = isDefaultWorkersEndpoint
+          ? 'block'
+          : 'none';
+        countrySelect.style.display = isDefaultWorkersEndpoint
+          ? 'block'
+          : 'none';
+        customCountryIpInput.style.display =
+          isDefaultWorkersEndpoint && countrySelect.value === 'custom'
+            ? 'block'
+            : 'none';
+      };
+
+      endpointSelect.addEventListener('change', () => {
+        if (endpointSelect.value === 'custom') {
+          customEndpointInput.style.display = 'block';
+        } else {
+          customEndpointInput.style.display = 'none';
+        }
+        updateCountrySelectAvailability();
+      });
+
+      updateCountrySelectAvailability();
+
+      document
+        .getElementById('submit-button')
+        .addEventListener('click', async () => {
+          activeButton = document.getElementById('submit-button');
+          const memberIdField = document.getElementById('ipb_member_id');
+          const passHashField = document.getElementById('ipb_pass_hash');
+          const memberIdMatch = memberIdField.value.match(MEMBER_ID_RE);
+          const passHashMatch = passHashField.value.match(PASS_HASH_RE);
+
+          if (!memberIdField.value || !passHashField.value) {
+            showError('Please fill in both fields.');
             return;
           }
-        } else {
-          spoofedIp = randomizeHostBits(countrySelect.value);
-        }
-        requestBody.cf_connecting_ip = spoofedIp;
-      }
 
-      try {
-        // POST, not GET - credentials belong in the body, not logged/cached/
-        // history-stored as part of a URL.
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
+          if (!memberIdMatch) {
+            showError('IPB Member ID must be a number.');
+            return;
+          }
+
+          if (!passHashMatch) {
+            showError('IPB Pass Hash must be a hex string.');
+            return;
+          }
+
+          const memberId = (memberIdField.value = memberIdMatch[0]);
+          const passHash = (passHashField.value = passHashMatch[0]);
+
+          let url = endpointSelect.value;
+          if (url === 'custom') {
+            url = customEndpointInput.value;
+            if (!url) {
+              showError('Please enter a valid API endpoint.');
+              return;
+            }
+          }
+
+          const requestBody = {
+            ipb_member_id: memberId,
+            ipb_pass_hash: passHash,
+          };
+          if (!countrySelect.disabled && countrySelect.value) {
+            let spoofedIp;
+            if (countrySelect.value === US_RANDOM_SENTINEL) {
+              spoofedIp = generateUsWarpIp();
+            } else if (countrySelect.value.startsWith(FASTLY_RANDOM_PREFIX)) {
+              spoofedIp = generateFastlyVpnIp(
+                countrySelect.value.slice(FASTLY_RANDOM_PREFIX.length),
+              );
+            } else if (countrySelect.value === 'custom') {
+              spoofedIp = customCountryIpInput.value.trim();
+              if (!IP_RE.test(spoofedIp)) {
+                showError('Please enter a valid CF-Connecting-IP value.');
+                return;
+              }
+            } else {
+              spoofedIp = randomizeHostBits(countrySelect.value);
+            }
+            requestBody.cf_connecting_ip = spoofedIp;
+          }
+
+          try {
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(requestBody),
+            });
+            const data = await response.json();
+
+            if (!response.ok) {
+              showError(data.error || `Error: HTTP ${response.status}`);
+              return;
+            }
+
+            document.getElementById('response-output').textContent =
+              JSON.stringify(data, null, 2);
+            document.getElementById('result').hidden = false;
+
+            if (data.accountStatus === 'unauthenticated') {
+              document.getElementById('copy-output').hidden = true;
+              document.getElementById('copy-button').hidden = true;
+              document.querySelector('#result > h3').hidden = true;
+              return;
+            }
+            const cookies = data.headers?.['set-cookie'];
+            const igneousMatch = cookies && cookies.match(/igneous=([^;]+)/);
+            const igneous = igneousMatch ? igneousMatch[1] : 'null';
+
+            if (igneous === 'mystery' || igneous === 'deleted') {
+              document.getElementById('copy-output').hidden = true;
+              document.getElementById('copy-button').hidden = true;
+              document.querySelector('#result > h3').hidden = true;
+              return;
+            }
+
+            const codeOutput = `ipb_member_id: ${memberId}\nipb_pass_hash: ${passHash}\nigneous: ${igneous}`;
+            document.getElementById('copy-output').textContent = codeOutput;
+
+            document.getElementById('copy-output').hidden = false;
+            document.getElementById('copy-button').hidden = false;
+            document.querySelector('#result > h3').hidden = false;
+          } catch (err) {
+            showError('Error: ' + err.message);
+          }
         });
-        const data = await response.json();
 
-        if (!response.ok) {
-          showError(data.error || `Error: HTTP ${response.status}`);
-          return;
-        }
+      document.getElementById('copy-button').addEventListener('click', () => {
+        activeButton = document.getElementById('copy-button');
+        navigator.clipboard
+          .writeText(document.getElementById('copy-output').textContent)
+          .then(() => {
+            showStatus('Code copied to clipboard!');
+          })
+          .catch((err) => {
+            showError('Failed to copy: ' + err.message);
+          });
+      });
 
-        document.getElementById("response-output").textContent = JSON.stringify(data, null, 2);
-        document.getElementById("result").hidden = false;
+      document
+        .getElementById('paste-button')
+        .addEventListener('click', async () => {
+          activeButton = document.getElementById('paste-button');
+          try {
+            const clipboardText = await navigator.clipboard.readText();
+            const data = parseClipboardData(clipboardText);
 
-        if (data.accountStatus === "unauthenticated") {
-          document.getElementById("copy-output").hidden = true;
-          document.getElementById("copy-button").hidden = true;
-          document.querySelector("#result > h3").hidden = true;
-          return;
-        }
-        const cookies = data.headers?.['set-cookie'];
-        const igneousMatch = cookies && cookies.match(/igneous=([^;]+)/);
-        const igneous = igneousMatch ? igneousMatch[1] : "null";
-
-        if (igneous === "mystery" || igneous === "deleted") {
-          document.getElementById("copy-output").hidden = true;
-          document.getElementById("copy-button").hidden = true;
-          document.querySelector("#result > h3").hidden = true;
-          return;
-        }
-
-        const codeOutput = `ipb_member_id: ${memberId}\nipb_pass_hash: ${passHash}\nigneous: ${igneous}`;
-        document.getElementById("copy-output").textContent = codeOutput;
-
-        document.getElementById("copy-output").hidden = false;
-        document.getElementById("copy-button").hidden = false;
-        document.querySelector("#result > h3").hidden = false;
-      } catch (err) {
-        showError("Error: " + err.message);
-      }
-    });
-
-    document.getElementById("copy-button").addEventListener("click", () => {
-      activeButton = document.getElementById("copy-button");
-      navigator.clipboard.writeText(document.getElementById("copy-output").textContent)
-        .then(() => {
-          showStatus("Code copied to clipboard!");
-        })
-        .catch(err => {
-          showError("Failed to copy: " + err.message);
+            if (data) {
+              document.getElementById('ipb_member_id').value =
+                data.ipb_member_id;
+              document.getElementById('ipb_pass_hash').value =
+                data.ipb_pass_hash;
+              showStatus('Data pasted from clipboard!');
+            } else {
+              showError('Invalid clipboard data format.');
+            }
+          } catch (err) {
+            showError('Failed to read clipboard: ' + err.message);
+          }
         });
-    });
 
-    document.getElementById("paste-button").addEventListener("click", async () => {
-      activeButton = document.getElementById("paste-button");
-      try {
-        const clipboardText = await navigator.clipboard.readText();
-        const data = parseClipboardData(clipboardText);
+      function parseClipboardData(text) {
+        const regex =
+          /ipb_member_id: (\d+)\s*ipb_pass_hash: ([a-f0-9]+)(\s*igneous: ([^]+))?/;
+        const match = text.match(regex);
 
-        if (data) {
-          document.getElementById("ipb_member_id").value = data.ipb_member_id;
-          document.getElementById("ipb_pass_hash").value = data.ipb_pass_hash;
-          showStatus("Data pasted from clipboard!");
-        } else {
-          showError("Invalid clipboard data format.");
+        if (match) {
+          return {
+            ipb_member_id: match[1],
+            ipb_pass_hash: match[2],
+            igneous: match[4] || '',
+          };
         }
-      } catch (err) {
-        showError("Failed to read clipboard: " + err.message);
-      }
-    });
-
-    function parseClipboardData(text) {
-      const regex = /ipb_member_id: (\d+)\s*ipb_pass_hash: ([a-f0-9]+)(\s*igneous: ([^]+))?/;
-      const match = text.match(regex);
-      
-      if (match) {
-        return {
-          ipb_member_id: match[1],
-          ipb_pass_hash: match[2],
-          igneous: match[4] || ''
-        };
-      }
-      return null;
-    }
-
-    function showBanner(id, message) {
-      const banner = document.getElementById(id);
-      banner.textContent = message;
-
-      if (activeButton) {
-        const other = document.getElementById(
-          id === "status-message" ? "error-message" : "status-message");
-        other.style.display = "none";
-        activeButton.after(banner, other);
+        return null;
       }
 
-      banner.style.display = "block";
-      banner.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      setTimeout(() => banner.style.display = "none", 3000);  // Hide after 3 seconds
-    }
+      function showBanner(id, message) {
+        const banner = document.getElementById(id);
+        banner.textContent = message;
 
-    function showStatus(message) {
-      showBanner("status-message", message);
-    }
+        if (activeButton) {
+          const other = document.getElementById(
+            id === 'status-message' ? 'error-message' : 'status-message',
+          );
+          other.style.display = 'none';
+          activeButton.after(banner, other);
+        }
 
-    function showError(message) {
-      showBanner("error-message", message);
-    }
-  </script>
+        banner.style.display = 'block';
+        banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setTimeout(() => (banner.style.display = 'none'), 3000);
+      }
 
-</body>
+      function showStatus(message) {
+        showBanner('status-message', message);
+      }
+
+      function showError(message) {
+        showBanner('error-message', message);
+      }
+    </script>
+  </body>
 </html>
