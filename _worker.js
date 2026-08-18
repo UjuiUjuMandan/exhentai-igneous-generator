@@ -296,6 +296,32 @@ export default {
         }
 
         async function queryEhentai() {
+          if (useFetch) {
+            const uconfigResponse = await fetch(
+              'https://e-hentai.org/uconfig.php',
+              { headers, redirect: 'manual' },
+            );
+            if (
+              uconfigResponse.status >= 300 &&
+              uconfigResponse.status < 400 &&
+              BOUNCE_LOGIN_RE.test(
+                uconfigResponse.headers.get('location') || '',
+              )
+            ) {
+              return { unauthenticatedConfirmed: true };
+            }
+            const body = await uconfigResponse.text();
+            const ehentaiRateLimitMatch = body.match(RATE_LIMIT_RE);
+            if (ehentaiRateLimitMatch) {
+              return { rateLimitExpiresIn: ehentaiRateLimitMatch[1] };
+            }
+            if (ACCOUNT_SUSPENDED_RE.test(body)) {
+              return { accountSuspended: true };
+            }
+            const ehentaiMatch = body.match(EHENTAI_BROWSING_COUNTRY_RE);
+            return { browsingCountry: ehentaiMatch ? ehentaiMatch[1] : null };
+          }
+
           const ehentaiIp =
             EHENTAI_ORIGIN_IPS[
               Math.floor(Math.random() * EHENTAI_ORIGIN_IPS.length)
