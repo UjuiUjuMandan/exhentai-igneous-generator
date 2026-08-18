@@ -116,6 +116,8 @@ export default {
         );
       }
 
+      const useFetch = url.searchParams.get('fetch') === '1';
+
       let ipbMemberId, ipbPassHash, cfConnectingIp;
       try {
         if (request.method === 'GET') {
@@ -170,10 +172,13 @@ export default {
         const loggedInMatch = forumsHtml.match(LOGGED_IN_RE);
 
         if (!loggedInMatch && GUEST_RE.test(forumsHtml)) {
+          const fetchHeaders =
+            useFetch ? (await queryExhentai()).headersObject : undefined;
           return new Response(
             JSON.stringify(
               {
                 accountStatus: 'unauthenticated',
+                ...(fetchHeaders ? { headers: fetchHeaders } : {}),
               },
               null,
               2,
@@ -220,6 +225,38 @@ export default {
         if (cfConnectingIp) directHeaders['CF-Connecting-IP'] = cfConnectingIp;
 
         async function queryExhentai() {
+          if (useFetch) {
+            const response = await fetch('https://exhentai.org/uconfig.php', {
+              headers,
+            });
+            const headersObject = {};
+            for (const [key, value] of response.headers.entries()) {
+              headersObject[key] = value;
+            }
+            const body = await response.text();
+
+            const rateLimitMatch = body.match(RATE_LIMIT_RE);
+            if (rateLimitMatch) {
+              return {
+                headersObject,
+                browsingCountry: null,
+                rateLimitExpiresIn: rateLimitMatch[1],
+              };
+            }
+            if (ACCOUNT_SUSPENDED_RE.test(body)) {
+              return {
+                headersObject,
+                browsingCountry: null,
+                accountSuspended: true,
+              };
+            }
+            const match = body.match(EXHENTAI_BROWSING_COUNTRY_RE);
+            return {
+              headersObject,
+              browsingCountry: match ? match[1] : null,
+            };
+          }
+
           const session = await openDirectHttpsSession({
             origin: url.origin,
             connectHost: 's.exhentai.org',
