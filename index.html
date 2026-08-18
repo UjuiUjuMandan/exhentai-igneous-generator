@@ -114,6 +114,12 @@
         <option data-azure-func-api hidden>
           Default - Microsoft Azure Functions
         </option>
+        <!-- The friendly domain excookie.mhdy.net is a plain 302 to
+             excookie.64396439.xyz, which a browser fetch() would follow by
+             downgrading POST to GET, so the value points at the real host. -->
+        <option value="https://excookie.64396439.xyz/">
+          excookie.mhdy.net
+        </option>
         <option value="custom">Custom</option>
       </select>
       <input
@@ -133,6 +139,13 @@
         placeholder="Enter IP address"
         style="display: none"
       />
+
+      <!-- excookie.mhdy.net only understands these two node names. -->
+      <label id="excookie-node-label" for="excookie-node-select">Node</label>
+      <select id="excookie-node-select" style="display: none">
+        <option value="美国">美国 (United States)</option>
+        <option value="德国">德国 (Germany)</option>
+      </select>
     </form>
 
     <form id="ipb-cookie-form">
@@ -199,6 +212,7 @@
       const MEMBER_ID_RE = /\d{1,20}/;
       const PASS_HASH_RE = /[a-f0-9]{16,128}/i;
       const IP_RE = /^[0-9a-fA-F:.]+$/;
+      const EXCOOKIE_URL = 'https://excookie.64396439.xyz/';
 
       let activeButton = null;
 
@@ -216,6 +230,7 @@
           privacyPolicy: '隐私政策',
           countryLabel: 'CF-Connecting-IP',
           countryDefault: '无',
+          excookieNodeLabel: '节点',
           scanLink: '国家扫描器',
         },
         en: {
@@ -231,6 +246,7 @@
           privacyPolicy: 'Privacy Policy',
           countryLabel: 'CF-Connecting-IP',
           countryDefault: 'None',
+          excookieNodeLabel: 'Node',
           scanLink: 'Country Scanner',
         },
       };
@@ -267,6 +283,8 @@
           translations[lang].countryLabel;
         document.getElementById('country-default-option').textContent =
           translations[lang].countryDefault;
+        document.getElementById('excookie-node-label').textContent =
+          translations[lang].excookieNodeLabel;
         document.getElementById('scan-link').textContent =
           translations[lang].scanLink;
       };
@@ -277,6 +295,12 @@
       const customEndpointInput = document.getElementById('custom-endpoint');
       const countrySelect = document.getElementById('country-select');
       const customCountryIpInput = document.getElementById('custom-country-ip');
+      const excookieNodeSelect = document.getElementById(
+        'excookie-node-select',
+      );
+      const excookieNodeLabel = document.getElementById(
+        'excookie-node-label',
+      );
 
       const US_RANDOM_IP_PATTERN =
         '2a09:bac1:76[8ace]0:[0-9][0-9a-f]{3}:0000:0000:0[0-9a-f]{3}:0[0-9a-f]{3}';
@@ -320,6 +344,7 @@
 
       const updateCountrySelectAvailability = () => {
         const isDefaultWorkersEndpoint = endpointSelect.value === '/api';
+        const isExcookieEndpoint = endpointSelect.value === EXCOOKIE_URL;
         countrySelect.disabled = !isDefaultWorkersEndpoint;
         countryLabel.style.display = isDefaultWorkersEndpoint
           ? 'block'
@@ -331,6 +356,12 @@
           isDefaultWorkersEndpoint && countrySelect.value === 'custom'
             ? 'block'
             : 'none';
+        excookieNodeLabel.style.display = isExcookieEndpoint
+          ? 'block'
+          : 'none';
+        excookieNodeSelect.style.display = isExcookieEndpoint
+          ? 'block'
+          : 'none';
       };
 
       endpointSelect.addEventListener('change', () => {
@@ -405,15 +436,25 @@
           }
 
           try {
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(requestBody),
-            });
+            let response;
+            if (url === EXCOOKIE_URL) {
+              // excookie.mhdy.net only accepts multipart form fields.
+              const form = new FormData();
+              form.append('ipb_member_id', memberId);
+              form.append('ipb_pass_hash', passHash);
+              form.append('node', excookieNodeSelect.value);
+              response = await fetch(url, { method: 'POST', body: form });
+            } else {
+              response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+              });
+            }
             const data = await response.json();
 
             if (!response.ok) {
-              showError(data.error || `Error: HTTP ${response.status}`);
+              showError(data.error || data.message || `Error: HTTP ${response.status}`);
               return;
             }
 
@@ -421,15 +462,27 @@
               JSON.stringify(data, null, 2);
             document.getElementById('result').hidden = false;
 
-            if (data.accountStatus === 'unauthenticated') {
-              document.getElementById('copy-output').hidden = true;
-              document.getElementById('copy-button').hidden = true;
-              document.querySelector('#result > h3').hidden = true;
-              return;
+            let igneous;
+            if (url === EXCOOKIE_URL) {
+              if (!data.success) {
+                document.getElementById('copy-output').hidden = true;
+                document.getElementById('copy-button').hidden = true;
+                document.querySelector('#result > h3').hidden = true;
+                showError(data.message || 'Request failed');
+                return;
+              }
+              igneous = data.result;
+            } else {
+              if (data.accountStatus === 'unauthenticated') {
+                document.getElementById('copy-output').hidden = true;
+                document.getElementById('copy-button').hidden = true;
+                document.querySelector('#result > h3').hidden = true;
+                return;
+              }
+              const cookies = data.headers?.['set-cookie'];
+              const igneousMatch = cookies && cookies.match(/igneous=([^;]+)/);
+              igneous = igneousMatch ? igneousMatch[1] : 'null';
             }
-            const cookies = data.headers?.['set-cookie'];
-            const igneousMatch = cookies && cookies.match(/igneous=([^;]+)/);
-            const igneous = igneousMatch ? igneousMatch[1] : 'null';
 
             if (igneous === 'mystery' || igneous === 'deleted') {
               document.getElementById('copy-output').hidden = true;
