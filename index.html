@@ -301,9 +301,7 @@
       const excookieNodeSelect = document.getElementById(
         'excookie-node-select',
       );
-      const excookieNodeLabel = document.getElementById(
-        'excookie-node-label',
-      );
+      const excookieNodeLabel = document.getElementById('excookie-node-label');
 
       const US_RANDOM_IP_PATTERN =
         '2a09:bac1:76[8ace]0:[0-9][0-9a-f]{3}:0000:0000:0[0-9a-f]{3}:0[0-9a-f]{3}';
@@ -359,9 +357,7 @@
           isDefaultWorkersEndpoint && countrySelect.value === 'custom'
             ? 'block'
             : 'none';
-        excookieNodeLabel.style.display = isExcookieEndpoint
-          ? 'block'
-          : 'none';
+        excookieNodeLabel.style.display = isExcookieEndpoint ? 'block' : 'none';
         excookieNodeSelect.style.display = isExcookieEndpoint
           ? 'block'
           : 'none';
@@ -457,7 +453,9 @@
             const data = await response.json();
 
             if (!response.ok) {
-              showError(data.error || data.message || `Error: HTTP ${response.status}`);
+              showError(
+                data.error || data.message || `Error: HTTP ${response.status}`,
+              );
               return;
             }
 
