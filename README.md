@@ -6,7 +6,7 @@ Fetch an ExHentai igneous cookie via a PaaS network proxy.
 
 ## Branches
 
-- `main` — Cloudflare Pages deployment. Used to fetch exhentai.org via plain `fetch()`, with a fixed egress IP of `2a06:98c0:3600::103` that ExHentai geolocates as the UK. Now uses `connect()` to talk directly to the origin, implementing TLS 1.3 + HTTP by hand, with a `CF-Connecting-IP` header spoofing an egress IP from any country.
+- `main` — Cloudflare Pages deployment.
 - `r` — formerly used for the Azure / GCP egress IPs.
 - `vercel` — unused, since Vercel's egress still ends up going through AWS anyway.
 - `awslambda` — deploys to AWS Lambda.
@@ -16,7 +16,7 @@ Fetch an ExHentai igneous cookie via a PaaS network proxy.
 ## `main` branch layout
 
 - `_worker.js` — Cloudflare Pages Function entry point.
-  - `/api` takes `ipb_member_id` / `ipb_pass_hash` (and an optional `cf_connecting_ip`), checks the forums for an account ban (plain `fetch()`), then connects directly to exhentai.org's `/uconfig.php` to grab igneous and the other account cookies, along with the currently-detected browsing country.
+  - `/api` takes `ipb_member_id` / `ipb_pass_hash` (and an optional `cf_connecting_ip`), checks the forums for an account ban (plain `fetch()`), then uses `connect()` to talk directly to the origin, implementing TLS 1.3 + HTTP by hand, with a `CF-Connecting-IP` header spoofing an egress IP from any country — hitting exhentai.org's and e-hentai.org's `/uconfig.php` to grab igneous and the other account cookies, along with the currently-detected browsing country. Passing `?fetch=1` A/B-switches both uconfig lookups back to plain `fetch()`, which per Cloudflare's docs sets `CF-Connecting-IP` to a fixed IPv6 egress (`2a06:98c0:3600::103`, geolocated as the UK) — no country spoofing.
   - `/api/scan` powers the country scanner: it runs a pre-flight check against e-hentai.org's origin (aborting up front if the account is logged out, suspended, or rate-limited, and only proceeding once it positively confirms a browsing country comes back), then probes each country in 27 random-IP countries, or all ~249 when the request sets `all_countries` over a **single** TLS/HTTP/2 connection to `s.exhentai.org` — each country is a separate multiplexed stream carrying its own spoofed `CF-Connecting-IP`, fired in waves — and streams each result back as NDJSON.
 - `index.html` — the single-lookup frontend.
 - `scan.html` — the country scanner: sweeps countries via `/api/scan`, filling a live results table and colouring an SVG world map (green = real igneous, amber = mystery/deleted, red = failed, grey = not scanned) as results stream in.
