@@ -42,6 +42,34 @@ const EHENTAI_ORIGIN_IPS = [
   '95.211.79.42',
 ];
 
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 30;
+const ipRequestHistory = new Map();
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const timestamps = ipRequestHistory.get(ip) || [];
+  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+
+  if (recent.length >= RATE_LIMIT_MAX_REQUESTS) {
+    ipRequestHistory.set(ip, recent);
+    return true;
+  }
+
+  recent.push(now);
+  ipRequestHistory.set(ip, recent);
+
+  if (ipRequestHistory.size > 10000) {
+    for (const [k, v] of ipRequestHistory.entries()) {
+      if (!v.some((t) => now - t < RATE_LIMIT_WINDOW_MS)) {
+        ipRequestHistory.delete(k);
+      }
+    }
+  }
+
+  return false;
+}
+
 const FORWARDED_CLIENT_HEADERS = ['User-Agent', 'Accept-Language'];
 
 function clientHeaders(request) {
@@ -75,6 +103,19 @@ export default {
             }
           : {};
 
+      if (request.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: corsHeaders });
+      }
+
+      const clientIp = request.headers.get('CF-Connecting-IP') || 'anonymous';
+      if (isRateLimited(clientIp)) {
+        return jsonError(
+          'Too many requests, please slow down.',
+          429,
+          corsHeaders,
+        );
+      }
+
       let ipbMemberId, ipbPassHash, cfConnectingIp;
       try {
         if (request.method === 'GET') {
@@ -86,8 +127,6 @@ export default {
           ipbMemberId = body.ipb_member_id;
           ipbPassHash = body.ipb_pass_hash;
           cfConnectingIp = body.cf_connecting_ip;
-        } else if (request.method === 'OPTIONS') {
-          return new Response(null, { status: 204, headers: corsHeaders });
         } else {
           return jsonError(
             'Only GET, POST, and OPTIONS methods are supported',
