@@ -6,6 +6,43 @@ app.use(express.json());
 
 const ALLOWED_ORIGIN = 'https://exhentai-igneous-generator.pages.dev';
 
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 30;
+const ipRequestHistory = new Map();
+
+function getClientIp(req) {
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) {
+    const ips = xff.split(',').map((s) => s.trim()).filter(Boolean);
+    if (ips.length) return ips[ips.length - 1];
+  }
+  return req.socket?.remoteAddress || 'anonymous';
+}
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const timestamps = ipRequestHistory.get(ip) || [];
+  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+
+  if (recent.length >= RATE_LIMIT_MAX_REQUESTS) {
+    ipRequestHistory.set(ip, recent);
+    return true;
+  }
+
+  recent.push(now);
+  ipRequestHistory.set(ip, recent);
+
+  if (ipRequestHistory.size > 10000) {
+    for (const [k, v] of ipRequestHistory.entries()) {
+      if (!v.some((t) => now - t < RATE_LIMIT_WINDOW_MS)) {
+        ipRequestHistory.delete(k);
+      }
+    }
+  }
+
+  return false;
+}
+
 const RATE_LIMIT_RE = /This IP address has been temporarily banned due to an excessive request rate\..*?The ban expires in (.*?)$/;
 const GUEST_RE = /<p class="pcen"><b>Welcome Guest<\/b>/;
 const LOGGED_IN_RE = /<p class="home"><b>Logged in as:\s*<a[^>]*>(.*?)<\/a>/;
@@ -38,6 +75,11 @@ app.use((req, res, next) => {
 });
 
 app.all('/api', async (req, res) => {
+  const clientIp = getClientIp(req);
+  if (isRateLimited(clientIp)) {
+    return res.status(429).json({ error: 'Too many requests, please slow down.' });
+  }
+
   try {
     const { method, query, body } = req;
     const ipbMemberId = method === "GET" ? query.ipb_member_id : body.ipb_member_id;
