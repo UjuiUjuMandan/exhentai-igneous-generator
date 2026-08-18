@@ -18,10 +18,25 @@ The web application will forward your E-Hentai account credentials to the chosen
 
 Cloudflare Web Analytics analyzes your data in aggregate, for overall traffic statistics.
 
+1.3.1. Third-party endpoint: excookie.mhdy.net
+
+The frontend also offers an optional third-party API endpoint (excookie.mhdy.net, served from excookie.64396439.xyz). When you select it, your ipb_member_id, ipb_pass_hash and chosen node name are submitted directly from your browser to that third-party service.
+
+This third-party service is provided "AS IS": its website publishes no privacy policy of any kind, and I cannot guarantee that it makes any commitment whatsoever regarding your data - including whether your credentials are logged, stored, shared, or otherwise processed. Do not use this endpoint unless you accept that your credentials are entirely outside this project's control once submitted.
+
 1.4. How will I not use your data
 
 Hacking into your E-Hentai account or selling your E-Hentai account credentials.
 
 Sharing your E-Hentai account credentials with any party other than the chosen cloud platform.
 
-Last edited: Fri Jul 17 20:20:11 CST 2026
+1.5. Change log
+
+1. 3ea38c4 Wed Nov 20 17:43:37 CST 2024 - Initial version: no logging claim, TLS encryption, hosted on Cloudflare Pages.
+2. 54a9117 Fri Nov 22 14:45:43 CST 2024 - Reword "this service" to "the default services", hosted on Cloudflare Workers and Google Cloud Run.
+3. 4ec635b Sat Nov 23 14:11:22 CST 2024 - Disclose Cloudflare Web Analytics collecting User-Agent and country.
+4. 83011d3 Thu Dec 5 20:16:53 CST 2024 - Reword hosting to "many third parties" (no longer just Workers and Cloud Run).
+5. 08e1c6c Fri Jul 17 20:20:11 CST 2026 - Full rewrite into numbered sections: what is known (IP, country, User-Agent, credentials), how data may be logged by each platform's defaults (e.g. AWS CloudWatch), how data is used and not used.
+6. Tue Aug 18 20:10:00 CST 2026 - Add section 1.3.1 (third-party endpoint excookie.mhdy.net, provided AS IS with no privacy policy on their side, no commitments guaranteed) and this change log, retroactively summarizing every prior revision from the git history.
+
+Last edited: Tue Aug 18 20:10:00 CST 2026
