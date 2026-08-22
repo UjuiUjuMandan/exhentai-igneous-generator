@@ -415,9 +415,9 @@
         }
       }
 
-      function resetMap(countries) {
+      function resetMap() {
         if (!mapSvg) return;
-        for (const country of countries) colorCountry(country, 'pending');
+        for (const country of ALL_COUNTRIES) colorCountry(country, 'pending');
       }
 
       function showError(msg) {
@@ -641,7 +641,7 @@
                 buildRows(scanCountries);
                 try {
                   await loadMap();
-                  resetMap(scanCountries);
+                  resetMap();
                   mapWrap.hidden = false;
                 } catch (e) {
                   console.warn('map load failed:', e);
