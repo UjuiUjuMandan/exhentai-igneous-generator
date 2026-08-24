@@ -295,33 +295,31 @@ export default {
           }
         }
 
-        async function queryEhentai() {
-          if (useFetch) {
-            const uconfigResponse = await fetch(
-              'https://e-hentai.org/uconfig.php',
-              { headers, redirect: 'manual' },
-            );
-            if (
-              uconfigResponse.status >= 300 &&
-              uconfigResponse.status < 400 &&
-              BOUNCE_LOGIN_RE.test(
-                uconfigResponse.headers.get('location') || '',
-              )
-            ) {
-              return { unauthenticatedConfirmed: true };
-            }
-            const body = await uconfigResponse.text();
-            const ehentaiRateLimitMatch = body.match(RATE_LIMIT_RE);
-            if (ehentaiRateLimitMatch) {
-              return { rateLimitExpiresIn: ehentaiRateLimitMatch[1] };
-            }
-            if (ACCOUNT_SUSPENDED_RE.test(body)) {
-              return { accountSuspended: true };
-            }
-            const ehentaiMatch = body.match(EHENTAI_BROWSING_COUNTRY_RE);
-            return { browsingCountry: ehentaiMatch ? ehentaiMatch[1] : null };
+        async function queryEhentaiFetch() {
+          const response = await fetch('https://e-hentai.org/uconfig.php', {
+            headers,
+            redirect: 'manual',
+          });
+          if (
+            response.status >= 300 &&
+            response.status < 400 &&
+            BOUNCE_LOGIN_RE.test(response.headers.get('location') || '')
+          ) {
+            return { unauthenticatedConfirmed: true };
           }
+          const body = await response.text();
+          const rateLimitMatch = body.match(RATE_LIMIT_RE);
+          const countryMatch = body.match(EHENTAI_BROWSING_COUNTRY_RE);
+          return {
+            accountSuspended: ACCOUNT_SUSPENDED_RE.test(body),
+            browsingCountry: countryMatch ? countryMatch[1] : null,
+            ...(rateLimitMatch
+              ? { rateLimitExpiresIn: rateLimitMatch[1] }
+              : {}),
+          };
+        }
 
+        async function queryEhentaiOrigin() {
           const ehentaiIp =
             EHENTAI_ORIGIN_IPS[
               Math.floor(Math.random() * EHENTAI_ORIGIN_IPS.length)
@@ -337,20 +335,10 @@ export default {
               path: '/uconfig.php',
               headers: directHeaders,
             });
-            if (
-              ehentaiResponse.status >= 300 &&
-              ehentaiResponse.status < 400 &&
-              BOUNCE_LOGIN_RE.test(ehentaiResponse.headers.location || '')
-            ) {
-              return { unauthenticatedConfirmed: true };
-            }
             const ehentaiRateLimitMatch =
               ehentaiResponse.body.match(RATE_LIMIT_RE);
             if (ehentaiRateLimitMatch) {
               return { rateLimitExpiresIn: ehentaiRateLimitMatch[1] };
-            }
-            if (ACCOUNT_SUSPENDED_RE.test(ehentaiResponse.body)) {
-              return { accountSuspended: true };
             }
             const ehentaiMatch = ehentaiResponse.body.match(
               EHENTAI_BROWSING_COUNTRY_RE,
@@ -361,29 +349,53 @@ export default {
           }
         }
 
-        const [exhentaiResult, ehentaiResult] = await Promise.all([
-          queryExhentai(),
-          queryEhentai(),
-        ]);
+        const ehentaiFetchResult = await queryEhentaiFetch();
+        if (
+          ehentaiFetchResult.unauthenticatedConfirmed ||
+          ehentaiFetchResult.accountSuspended
+        ) {
+          const accountStatus = ehentaiFetchResult.unauthenticatedConfirmed
+            ? 'unauthenticated'
+            : 'suspended';
+          return new Response(
+            JSON.stringify(
+              {
+                accountStatus,
+                ...(loginName ? { loginName } : {}),
+              },
+              null,
+              2,
+            ),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            },
+          );
+        }
+
+        const exhentaiResult = await queryExhentai();
+        let ehentaiOriginResult = {};
+        if (exhentaiResult.browsingCountry === null) {
+          ehentaiOriginResult = useFetch
+            ? ehentaiFetchResult
+            : await queryEhentaiOrigin();
+        }
 
         const headersObject = exhentaiResult.headersObject;
-        const unauthenticatedConfirmed = ehentaiResult.unauthenticatedConfirmed;
-        const accountSuspended =
-          exhentaiResult.accountSuspended || ehentaiResult.accountSuspended;
+        const accountSuspended = exhentaiResult.accountSuspended;
         const browsingCountry =
           exhentaiResult.browsingCountry ??
-          ehentaiResult.browsingCountry ??
+          ehentaiOriginResult.browsingCountry ??
           null;
         const rateLimitExpiresIn =
-          exhentaiResult.rateLimitExpiresIn || ehentaiResult.rateLimitExpiresIn;
+          exhentaiResult.rateLimitExpiresIn ||
+          ehentaiOriginResult.rateLimitExpiresIn;
 
-        const accountStatus = unauthenticatedConfirmed
-          ? 'unauthenticated'
-          : accountSuspended
-            ? 'suspended'
-            : loggedInMatch || browsingCountry !== null
-              ? 'not suspended'
-              : 'Unknown';
+        const accountStatus = accountSuspended
+          ? 'suspended'
+          : loggedInMatch || browsingCountry !== null
+            ? 'not suspended'
+            : 'Unknown';
 
         return new Response(
           JSON.stringify(
