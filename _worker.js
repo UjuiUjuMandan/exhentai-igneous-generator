@@ -503,44 +503,29 @@ export default {
             : RANDOM_IP_COUNTRIES;
 
           try {
-            const ehentaiIp =
-              EHENTAI_ORIGIN_IPS[
-                Math.floor(Math.random() * EHENTAI_ORIGIN_IPS.length)
-              ];
-            const checkSession = await openDirectHttpsSession({
-              origin: url.origin,
-              connectHost: ehentaiIp,
-              hostHeader: 'e-hentai.org',
-              sniHost: 'e-hentai.org',
+            const res = await fetch('https://e-hentai.org/uconfig.php', {
+              headers: { ...baseHeaders, Cookie: cookie },
+              redirect: 'manual',
             });
+            const body = await res.text();
             let precheck;
-            try {
-              const res = await checkSession.request({
-                path: '/uconfig.php',
-                headers: { ...baseHeaders, Cookie: cookie },
-              });
-              if (
-                res.status >= 300 &&
-                res.status < 400 &&
-                BOUNCE_LOGIN_RE.test(res.headers.location || '')
-              ) {
-                precheck = { unauthenticated: true };
-              } else if (ACCOUNT_SUSPENDED_RE.test(res.body)) {
-                precheck = { suspended: true };
-              } else if (res.body.match(RATE_LIMIT_RE)) {
-                precheck = { rateLimited: res.body.match(RATE_LIMIT_RE)[1] };
-              } else {
-                const countryMatch = res.body.match(
-                  EHENTAI_BROWSING_COUNTRY_RE,
-                );
-                const loggedInMatch = res.body.match(LOGGED_IN_RE);
-                precheck = {
-                  browsingCountry: countryMatch ? countryMatch[1] : undefined,
-                  loginName: loggedInMatch ? loggedInMatch[1] : undefined,
-                };
-              }
-            } finally {
-              await checkSession.close();
+            if (
+              res.status >= 300 &&
+              res.status < 400 &&
+              BOUNCE_LOGIN_RE.test(res.headers.get('location') || '')
+            ) {
+              precheck = { unauthenticated: true };
+            } else if (ACCOUNT_SUSPENDED_RE.test(body)) {
+              precheck = { suspended: true };
+            } else if (body.match(RATE_LIMIT_RE)) {
+              precheck = { rateLimited: body.match(RATE_LIMIT_RE)[1] };
+            } else {
+              const countryMatch = body.match(EHENTAI_BROWSING_COUNTRY_RE);
+              const loggedInMatch = body.match(LOGGED_IN_RE);
+              precheck = {
+                browsingCountry: countryMatch ? countryMatch[1] : undefined,
+                loginName: loggedInMatch ? loggedInMatch[1] : undefined,
+              };
             }
 
             if (precheck.unauthenticated) {
