@@ -233,6 +233,9 @@ export default {
             for (const [key, value] of response.headers.entries()) {
               headersObject[key] = value;
             }
+            const setCookies = response.headers.getAll('Set-Cookie');
+            if (setCookies.length)
+              headersObject['set-cookie'] = setCookies.join(', ');
             const body = await response.text();
 
             const rateLimitMatch = body.match(RATE_LIMIT_RE);
