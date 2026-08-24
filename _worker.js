@@ -376,9 +376,13 @@ export default {
         const exhentaiResult = await queryExhentai();
         let ehentaiOriginResult = {};
         if (exhentaiResult.browsingCountry === null) {
-          ehentaiOriginResult = useFetch
-            ? ehentaiFetchResult
-            : await queryEhentaiOrigin();
+          if (useFetch) {
+            ehentaiOriginResult = ehentaiFetchResult;
+          } else {
+            try {
+              ehentaiOriginResult = await queryEhentaiOrigin();
+            } catch {}
+          }
         }
 
         const headersObject = exhentaiResult.headersObject;
