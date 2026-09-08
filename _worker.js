@@ -522,16 +522,43 @@ export default {
             : RANDOM_IP_COUNTRIES;
 
           try {
-            const res = await fetch('https://e-hentai.org/uconfig.php', {
+            let res = await fetch('https://e-hentai.org/uconfig.php', {
               headers: { ...baseHeaders, Cookie: cookie },
               redirect: 'manual',
             });
-            const body = await res.text();
+            let responseStatus = res.status;
+            let responseLocation = res.headers.get('location') || '';
+            let body = await res.text();
+
+            if (RATE_LIMIT_RE.test(body)) {
+              const ehentaiIp =
+                EHENTAI_ORIGIN_IPS[
+                  Math.floor(Math.random() * EHENTAI_ORIGIN_IPS.length)
+                ];
+              const precheckSession = await openDirectHttpsSession({
+                origin: url.origin,
+                connectHost: ehentaiIp,
+                hostHeader: 'e-hentai.org',
+                sniHost: 'e-hentai.org',
+              });
+              try {
+                res = await precheckSession.request({
+                  path: '/uconfig.php',
+                  headers: { ...baseHeaders, Cookie: cookie },
+                });
+                responseStatus = res.status;
+                responseLocation = res.headers.location || '';
+                body = res.body;
+              } finally {
+                await precheckSession.close();
+              }
+            }
+
             let precheck;
             if (
-              res.status >= 300 &&
-              res.status < 400 &&
-              BOUNCE_LOGIN_RE.test(res.headers.get('location') || '')
+              responseStatus >= 300 &&
+              responseStatus < 400 &&
+              BOUNCE_LOGIN_RE.test(responseLocation)
             ) {
               precheck = { unauthenticated: true };
             } else if (ACCOUNT_SUSPENDED_RE.test(body)) {
