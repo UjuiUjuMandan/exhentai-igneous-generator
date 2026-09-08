@@ -1,0 +1,69 @@
+name: Check EHENTAI_ORIGIN_IPS
+
+on:
+  schedule:
+    # UTC 00:00 daily
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check origin IPs
+        id: check
+        run: |
+          IPS=$(node -e "
+            const src = require('fs').readFileSync('_worker.js', 'utf8');
+            const m = src.match(/EHENTAI_ORIGIN_IPS = \[([\s\S]*?)\]/);
+            if (!m) throw new Error('EHENTAI_ORIGIN_IPS not found');
+            console.log([...m[1].matchAll(/'([^']+)'/g)].map(x => x[1]).join('\n'));
+          ")
+
+          FAILED=""
+          PASSED=0
+          while IFS= read -r ip; do
+            code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "https://$ip/uconfig.php" -H "Host: e-hentai.org" || echo 000)
+            if [ "$code" = "302" ]; then
+              PASSED=$((PASSED + 1))
+              echo "$ip -> $code OK"
+            else
+              echo "$ip -> $code FAIL"
+              FAILED="$FAILED $ip"
+            fi
+          done <<< "$IPS"
+
+          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+          if [ -n "$FAILED" ]; then
+            echo "failed=$(echo $FAILED)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open issue on failure
+        if: steps.check.outputs.failed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          FAILED: ${{ steps.check.outputs.failed }}
+          PASSED: ${{ steps.check.outputs.passed }}
+        run: |
+          TITLE="EHENTAI_ORIGIN_IPS health check failed"
+          BODY="Daily origin IP check found failures.
+
+          Failed: \`${FAILED}\`
+          Passed: ${PASSED} IPs
+
+          Run: ${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}
+
+          @UjuiUjuMandan"
+
+          EXISTING=$(gh issue list -R "$REPO" --state open --label origin-ip-down --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" -R "$REPO" --body "$BODY"
+          else
+            gh issue create -R "$REPO" --title "$TITLE" --body "$BODY" --label origin-ip-down
+          fi
